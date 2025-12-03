@@ -129,7 +129,7 @@ export async function registerRoutes(
     }
   });
 
-  // Proxy OneDrive thumbnails
+  // Proxy OneDrive thumbnails - use actual thumbnails API for speed
   app.get("/api/onedrive/thumbnail/:fileId", async (req, res) => {
     try {
       const { fileId } = req.params;
@@ -137,11 +137,21 @@ export async function registerRoutes(
       const { getOneDriveClient } = await import("./cloud-storage");
       const client = await getOneDriveClient();
       
-      const response = await client.api(`/me/drive/items/${fileId}/content`).get();
+      // Get thumbnail URL from OneDrive
+      const thumbnails = await client.api(`/me/drive/items/${fileId}/thumbnails`).get();
       
-      res.setHeader('Content-Type', 'image/jpeg');
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      res.send(response);
+      if (thumbnails.value && thumbnails.value.length > 0) {
+        const thumb = thumbnails.value[0];
+        const thumbnailUrl = thumb.large?.url || thumb.medium?.url || thumb.small?.url;
+        
+        if (thumbnailUrl) {
+          // Redirect to the thumbnail URL
+          return res.redirect(thumbnailUrl);
+        }
+      }
+      
+      // Fallback: return a placeholder response
+      res.status(404).json({ error: 'No thumbnail available' });
     } catch (error: any) {
       console.error('Error fetching OneDrive thumbnail:', error);
       res.status(500).json({ error: 'Failed to fetch thumbnail' });

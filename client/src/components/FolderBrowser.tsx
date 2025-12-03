@@ -30,7 +30,7 @@ export function FolderBrowser({
   return (
     <div className="w-full max-w-4xl mx-auto p-6">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 mb-6 flex-wrap">
+      <div className="flex items-center gap-2 mb-4 sm:mb-6 flex-wrap">
         <button
           onClick={onBack}
           className="p-2 rounded-lg hover:bg-secondary transition-colors"
@@ -39,14 +39,14 @@ export function FolderBrowser({
           <ArrowLeft className="w-5 h-5" />
         </button>
         
-        <div className="flex items-center gap-1 text-sm">
-          <span className="font-medium text-muted-foreground">
-            {source === 'gdrive' ? 'Google Drive' : 'OneDrive'}
+        <div className="flex items-center gap-1 text-xs sm:text-sm overflow-x-auto">
+          <span className="font-medium text-muted-foreground whitespace-nowrap">
+            {source === 'gdrive' ? 'Drive' : 'OneDrive'}
           </span>
-          {currentPath.map((item, index) => (
+          {currentPath.slice(-2).map((item, index) => (
             <span key={item.id} className="flex items-center gap-1">
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              <span className={index === currentPath.length - 1 ? 'font-semibold' : 'text-muted-foreground'}>
+              <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
+              <span className={`whitespace-nowrap truncate max-w-[60px] sm:max-w-[120px] ${index === currentPath.slice(-2).length - 1 ? 'font-semibold' : 'text-muted-foreground'}`}>
                 {item.name}
               </span>
             </span>
@@ -55,10 +55,10 @@ export function FolderBrowser({
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 sm:mb-6">
         <div>
-          <h2 className="text-2xl font-bold">Browse Folders</h2>
-          <p className="text-muted-foreground text-sm">
+          <h2 className="text-xl sm:text-2xl font-bold">Browse Folders</h2>
+          <p className="text-muted-foreground text-xs sm:text-sm">
             {folders.length} folders, {images.length} photos
           </p>
         </div>
@@ -68,11 +68,11 @@ export function FolderBrowser({
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={onSelectFolder}
-            className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-full font-medium shadow-lg shadow-primary/20"
+            className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-primary text-white rounded-full font-medium shadow-lg shadow-primary/20 text-sm sm:text-base w-full sm:w-auto"
             data-testid="button-select-folder"
           >
             <Image className="w-4 h-4" />
-            Select This Folder ({images.length} photos)
+            Select Folder ({images.length})
           </motion.button>
         )}
       </div>
@@ -88,20 +88,20 @@ export function FolderBrowser({
           {folders.length > 0 && (
             <div className="mb-8">
               <h3 className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider">Folders</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
                 {folders.map((folder) => (
                   <motion.button
                     key={folder.id}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => onNavigate(folder.id, folder.name)}
-                    className="flex items-center gap-3 p-4 bg-white rounded-xl border border-border hover:border-primary/30 hover:shadow-md transition-all text-left"
+                    className="flex items-center gap-2 sm:gap-3 p-2 sm:p-4 bg-white rounded-lg sm:rounded-xl border border-border hover:border-primary/30 hover:shadow-md transition-all text-left"
                     data-testid={`folder-${folder.id}`}
                   >
-                    <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Folder className="w-5 h-5 fill-current" />
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Folder className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
                     </div>
-                    <span className="font-medium truncate">{folder.name}</span>
+                    <span className="font-medium text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">{folder.name}</span>
                   </motion.button>
                 ))}
               </div>
