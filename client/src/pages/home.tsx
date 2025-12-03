@@ -1,9 +1,9 @@
-
 import { useState } from "react";
 import { FilePicker } from "@/components/FilePicker";
 import { PhotoGrid } from "@/components/PhotoGrid";
 import { FolderView } from "@/components/FolderView";
-import { MOCK_FILES, FileItem } from "@/lib/mockData";
+import { FolderBrowser } from "@/components/FolderBrowser";
+import { FileItem } from "@/lib/mockData";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { 
@@ -15,7 +15,7 @@ import {
 } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
-type AppState = 'picking' | 'loading' | 'browsing' | 'sorting' | 'sorted';
+type AppState = 'picking' | 'loading' | 'folder-browsing' | 'browsing' | 'sorting' | 'sorted';
 
 function formatBytes(bytes: number, decimals = 1) {
   if (bytes === 0) return '0 B';
@@ -31,56 +31,57 @@ export default function Home() {
   const [source, setSource] = useState<string | null>(null);
   const { toast } = useToast();
   
-  // State to track where files are located
+  // State to track files
   const [unsortedFiles, setUnsortedFiles] = useState<FileItem[]>([]);
   const [sortedFiles, setSortedFiles] = useState<FileItem[]>([]);
   const [cloudFiles, setCloudFiles] = useState<CloudFile[]>([]);
+  const [allCloudFiles, setAllCloudFiles] = useState<CloudFile[]>([]);
+  
+  // Folder navigation state
+  const [currentFolderId, setCurrentFolderId] = useState<string>('root');
+  const [folderPath, setFolderPath] = useState<{ id: string; name: string }[]>([]);
+  const [isBrowsingLoading, setIsBrowsingLoading] = useState(false);
+
+  const loadCloudFolder = async (src: string, folderId: string) => {
+    setIsBrowsingLoading(true);
+    try {
+      let files: CloudFile[];
+      if (src === 'gdrive') {
+        files = await fetchGoogleDrivePhotos(folderId);
+      } else {
+        files = await fetchOneDrivePhotos(folderId);
+      }
+      setAllCloudFiles(files);
+      setIsBrowsingLoading(false);
+    } catch (error: any) {
+      console.error('Error loading folder:', error);
+      toast({
+        title: "Error loading folder",
+        description: error.message || "Failed to load folder contents",
+        variant: "destructive",
+      });
+      setIsBrowsingLoading(false);
+    }
+  };
 
   const handleSelectSource = async (src: string, files?: FileItem[]) => {
     setSource(src);
-    setState('loading');
     setSortedFiles([]);
     
     try {
-      // If files are provided (from local input), use them
       if (files && files.length > 0) {
+        // Local files - go directly to browsing
         setUnsortedFiles(files);
         setCloudFiles([]);
-      } else if (src === 'gdrive') {
-        // Fetch from Google Drive
-        const driveFiles = await fetchGoogleDrivePhotos();
-        const imageFiles = driveFiles.filter(f => f.mimeType.startsWith('image/'));
-        setCloudFiles(imageFiles);
-        
-        // Convert to FileItem format for display
-        const displayFiles: FileItem[] = imageFiles.map(f => ({
-          id: f.id,
-          url: f.thumbnailLink || f.webViewLink || '',
-          name: f.name,
-          date: new Date(f.modifiedTime || f.createdTime || Date.now()),
-          type: 'image',
-          size: f.size ? formatBytes(f.size) : '0 B'
-        }));
-        setUnsortedFiles(displayFiles);
-      } else if (src === 'onedrive') {
-        // Fetch from OneDrive
-        const onedriveFiles = await fetchOneDrivePhotos();
-        const imageFiles = onedriveFiles.filter(f => f.mimeType.startsWith('image/'));
-        setCloudFiles(imageFiles);
-        
-        // Convert to FileItem format for display
-        const displayFiles: FileItem[] = imageFiles.map(f => ({
-          id: f.id,
-          url: f.thumbnailLink || f.webViewLink || '',
-          name: f.name,
-          date: new Date(f.modifiedTime || f.createdTime || Date.now()),
-          type: 'image',
-          size: f.size ? formatBytes(f.size) : '0 B'
-        }));
-        setUnsortedFiles(displayFiles);
+        setState('browsing');
+      } else if (src === 'gdrive' || src === 'onedrive') {
+        // Cloud storage - show folder browser
+        setState('loading');
+        setCurrentFolderId('root');
+        setFolderPath([]);
+        await loadCloudFolder(src, 'root');
+        setState('folder-browsing');
       }
-
-      setState('browsing');
     } catch (error: any) {
       console.error('Error loading files:', error);
       toast({
@@ -92,34 +93,74 @@ export default function Home() {
     }
   };
 
+  const handleNavigateFolder = async (folderId: string, folderName: string) => {
+    if (!source) return;
+    setCurrentFolderId(folderId);
+    setFolderPath([...folderPath, { id: folderId, name: folderName }]);
+    await loadCloudFolder(source, folderId);
+  };
+
+  const handleBackFolder = () => {
+    if (folderPath.length === 0) {
+      // Go back to source picker
+      setState('picking');
+      setSource(null);
+      return;
+    }
+    
+    const newPath = [...folderPath];
+    newPath.pop();
+    setFolderPath(newPath);
+    
+    const parentId = newPath.length > 0 ? newPath[newPath.length - 1].id : 'root';
+    setCurrentFolderId(parentId);
+    if (source) {
+      loadCloudFolder(source, parentId);
+    }
+  };
+
+  const handleSelectCloudFolder = () => {
+    const imageFiles = allCloudFiles.filter(f => f.mimeType.startsWith('image/'));
+    setCloudFiles(imageFiles);
+    
+    // Convert to FileItem format for display
+    const displayFiles: FileItem[] = imageFiles.map(f => ({
+      id: f.id,
+      url: f.thumbnailLink || '',
+      name: f.name,
+      date: new Date(f.modifiedTime || f.createdTime || Date.now()),
+      type: 'image',
+      size: f.size ? formatBytes(f.size) : '0 B'
+    }));
+    setUnsortedFiles(displayFiles);
+    setState('browsing');
+  };
+
   const handleSort = async () => {
     if (unsortedFiles.length === 0) return;
 
     setState('sorting');
     
     try {
-      // For cloud sources, perform actual file operations
       if (source === 'gdrive' && cloudFiles.length > 0) {
-        await organizeGoogleDrivePhotos(cloudFiles);
+        await organizeGoogleDrivePhotos(cloudFiles, currentFolderId);
         toast({
           title: "Photos organized!",
           description: `Successfully organized ${cloudFiles.length} photos into year folders in Google Drive.`,
         });
       } else if (source === 'onedrive' && cloudFiles.length > 0) {
-        await organizeOneDrivePhotos(cloudFiles);
+        await organizeOneDrivePhotos(cloudFiles, currentFolderId);
         toast({
           title: "Photos organized!",
           description: `Successfully organized ${cloudFiles.length} photos into year folders in OneDrive.`,
         });
       } else {
-        // For local files, just simulate the move
         toast({
           title: "Photos organized!",
           description: "Photos have been sorted by year (local preview only).",
         });
       }
 
-      // Update UI state
       setSortedFiles([...sortedFiles, ...unsortedFiles]);
       setUnsortedFiles([]);
       setCloudFiles([]);
@@ -139,22 +180,36 @@ export default function Home() {
     setState('browsing');
   };
 
+  const handleBackToPicker = () => {
+    setState('picking');
+    setSource(null);
+    setUnsortedFiles([]);
+    setSortedFiles([]);
+    setCloudFiles([]);
+    setAllCloudFiles([]);
+    setFolderPath([]);
+    setCurrentFolderId('root');
+  };
+
   return (
     <div className="min-h-screen bg-background font-sans text-foreground selection:bg-primary/10 selection:text-primary">
       {/* Header */}
       <header className="fixed top-0 w-full z-50 px-6 py-4 bg-background/80 backdrop-blur-md border-b border-border/40">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <button 
+            onClick={handleBackToPicker}
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          >
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white font-display font-bold text-lg">
               C
             </div>
             <span className="font-display font-bold text-xl tracking-tight">Curator</span>
-          </div>
+          </button>
           
           {source && (
             <div className="text-sm font-medium px-3 py-1 bg-secondary rounded-full flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Connected: <span className="capitalize">{source === 'gdrive' ? 'Google Drive' : source}</span>
+              Connected: <span className="capitalize">{source === 'gdrive' ? 'Google Drive' : source === 'onedrive' ? 'OneDrive' : source}</span>
             </div>
           )}
         </div>
@@ -182,7 +237,26 @@ export default function Home() {
               className="min-h-[60vh] flex flex-col items-center justify-center gap-4"
             >
               <Loader2 className="w-12 h-12 text-primary animate-spin" />
-              <p className="text-muted-foreground font-medium">Scanning directory...</p>
+              <p className="text-muted-foreground font-medium">Connecting to cloud storage...</p>
+            </motion.div>
+          )}
+
+          {state === 'folder-browsing' && source && (
+            <motion.div
+              key="folder-browser"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+            >
+              <FolderBrowser
+                files={allCloudFiles}
+                currentPath={folderPath}
+                onNavigate={handleNavigateFolder}
+                onBack={handleBackFolder}
+                onSelectFolder={handleSelectCloudFolder}
+                isLoading={isBrowsingLoading}
+                source={source}
+              />
             </motion.div>
           )}
 

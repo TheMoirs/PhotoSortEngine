@@ -1,6 +1,6 @@
 
-import { motion, AnimatePresence } from "framer-motion";
-import { FolderOpen, HardDrive, Cloud, CloudLightning, ArrowRight, X, Loader2 } from "lucide-react";
+import { motion } from "framer-motion";
+import { FolderOpen, HardDrive, Cloud, CloudLightning, ArrowRight, Loader2 } from "lucide-react";
 import { useState, useRef } from "react";
 import { FileItem } from "@/lib/mockData";
 
@@ -9,7 +9,6 @@ interface FilePickerProps {
 }
 
 export function FilePicker({ onSelectSource }: FilePickerProps) {
-  const [showLogin, setShowLogin] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isReading, setIsReading] = useState(false);
 
@@ -57,14 +56,10 @@ export function FilePicker({ onSelectSource }: FilePickerProps) {
     }
   };
 
-  const handleLogin = (provider: string) => {
-    // Simulate auth flow
+  const handleCloudConnect = (provider: string) => {
+    // Directly connect to cloud - integrations are already set up on backend
     setIsReading(true);
-    setTimeout(() => {
-      setIsReading(false);
-      setShowLogin(null);
-      onSelectSource(provider);
-    }, 2000);
+    onSelectSource(provider);
   };
 
   return (
@@ -121,71 +116,19 @@ export function FilePicker({ onSelectSource }: FilePickerProps) {
             icon={Cloud} 
             label="Google Drive" 
             desc="Connect cloud storage"
-            onClick={() => setShowLogin('gdrive')}
+            onClick={() => handleCloudConnect('gdrive')}
             variants={item}
           />
           <SourceCard 
             icon={CloudLightning} 
             label="OneDrive" 
             desc="Sync from Microsoft"
-            onClick={() => setShowLogin('onedrive')}
+            onClick={() => handleCloudConnect('onedrive')}
             variants={item}
           />
         </motion.div>
       )}
 
-      <AnimatePresence>
-        {showLogin && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl relative overflow-hidden"
-            >
-              <button 
-                onClick={() => setShowLogin(null)}
-                className="absolute top-4 right-4 p-2 hover:bg-secondary rounded-full transition-colors"
-              >
-                <X className="w-5 h-5 text-muted-foreground" />
-              </button>
-
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mx-auto mb-4">
-                  {showLogin === 'gdrive' ? (
-                    <Cloud className="w-8 h-8 text-primary" />
-                  ) : (
-                    <CloudLightning className="w-8 h-8 text-primary" />
-                  )}
-                </div>
-                <h3 className="text-2xl font-bold mb-2">
-                  Login to {showLogin === 'gdrive' ? 'Google Drive' : 'OneDrive'}
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  Connect your account to access and organize your cloud photos.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <button
-                  onClick={() => handleLogin(showLogin)}
-                  className="w-full py-3 px-4 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
-                >
-                  Continue with {showLogin === 'gdrive' ? 'Google' : 'Microsoft'}
-                </button>
-                <p className="text-xs text-center text-muted-foreground px-4">
-                  By connecting, you allow PhotoCurator to read your file metadata. No photos are uploaded to our servers.
-                </p>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
