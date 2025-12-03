@@ -17,9 +17,20 @@ export default function Home() {
   const [unsortedFiles, setUnsortedFiles] = useState<FileItem[]>(MOCK_FILES);
   const [sortedFiles, setSortedFiles] = useState<FileItem[]>([]);
 
-  const handleSelectSource = (src: string) => {
+  const handleSelectSource = (src: string, files?: FileItem[]) => {
     setSource(src);
     setState('loading');
+    
+    // If files are provided (from local input), use them
+    if (files && files.length > 0) {
+      setUnsortedFiles(files);
+      setSortedFiles([]); // Reset sorted files when new source is selected
+    } else if (src !== 'local') {
+      // For cloud sources, we still use mock data for now as we can't really auth
+      setUnsortedFiles(MOCK_FILES);
+      setSortedFiles([]);
+    }
+
     // Simulate scanning/loading delay
     setTimeout(() => {
       setState('browsing');
