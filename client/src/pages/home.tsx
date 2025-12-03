@@ -3,7 +3,7 @@ import { useState } from "react";
 import { FilePicker } from "@/components/FilePicker";
 import { PhotoGrid } from "@/components/PhotoGrid";
 import { FolderView } from "@/components/FolderView";
-import { MOCK_FILES } from "@/lib/mockData";
+import { MOCK_FILES, FileItem } from "@/lib/mockData";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
 
@@ -12,6 +12,10 @@ type AppState = 'picking' | 'loading' | 'browsing' | 'sorting' | 'sorted';
 export default function Home() {
   const [state, setState] = useState<AppState>('picking');
   const [source, setSource] = useState<string | null>(null);
+  
+  // State to track where files are located
+  const [unsortedFiles, setUnsortedFiles] = useState<FileItem[]>(MOCK_FILES);
+  const [sortedFiles, setSortedFiles] = useState<FileItem[]>([]);
 
   const handleSelectSource = (src: string) => {
     setSource(src);
@@ -23,14 +27,19 @@ export default function Home() {
   };
 
   const handleSort = () => {
+    if (unsortedFiles.length === 0) return;
+
     setState('sorting');
-    // Simulate sorting animation delay
+    
+    // Simulate sorting animation delay and "physical move"
     setTimeout(() => {
+      setSortedFiles([...sortedFiles, ...unsortedFiles]);
+      setUnsortedFiles([]); // Clear the root folder
       setState('sorted');
     }, 800);
   };
 
-  const handleReset = () => {
+  const handleBackToRoot = () => {
     setState('browsing');
   };
 
@@ -90,9 +99,11 @@ export default function Home() {
               exit={{ opacity: 0, scale: 0.95 }}
             >
               <PhotoGrid 
-                files={MOCK_FILES} 
+                files={unsortedFiles} 
                 onSort={handleSort} 
                 isSorting={state === 'sorting'}
+                hasSortedFiles={sortedFiles.length > 0}
+                onViewFolders={() => setState('sorted')}
               />
             </motion.div>
           )}
@@ -104,8 +115,8 @@ export default function Home() {
               animate={{ opacity: 1 }}
             >
               <FolderView 
-                files={MOCK_FILES} 
-                onReset={handleReset}
+                files={sortedFiles} 
+                onReset={handleBackToRoot}
               />
             </motion.div>
           )}
