@@ -6,48 +6,133 @@ import { FolderView } from "@/components/FolderView";
 import { MOCK_FILES, FileItem } from "@/lib/mockData";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
+import { 
+  fetchGoogleDrivePhotos, 
+  fetchOneDrivePhotos, 
+  organizeGoogleDrivePhotos,
+  organizeOneDrivePhotos,
+  type CloudFile 
+} from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 type AppState = 'picking' | 'loading' | 'browsing' | 'sorting' | 'sorted';
+
+function formatBytes(bytes: number, decimals = 1) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
 
 export default function Home() {
   const [state, setState] = useState<AppState>('picking');
   const [source, setSource] = useState<string | null>(null);
+  const { toast } = useToast();
   
   // State to track where files are located
-  const [unsortedFiles, setUnsortedFiles] = useState<FileItem[]>(MOCK_FILES);
+  const [unsortedFiles, setUnsortedFiles] = useState<FileItem[]>([]);
   const [sortedFiles, setSortedFiles] = useState<FileItem[]>([]);
+  const [cloudFiles, setCloudFiles] = useState<CloudFile[]>([]);
 
-  const handleSelectSource = (src: string, files?: FileItem[]) => {
+  const handleSelectSource = async (src: string, files?: FileItem[]) => {
     setSource(src);
     setState('loading');
+    setSortedFiles([]);
     
-    // If files are provided (from local input), use them
-    if (files && files.length > 0) {
-      setUnsortedFiles(files);
-      setSortedFiles([]); // Reset sorted files when new source is selected
-    } else if (src !== 'local') {
-      // For cloud sources, we still use mock data for now as we can't really auth
-      setUnsortedFiles(MOCK_FILES);
-      setSortedFiles([]);
-    }
+    try {
+      // If files are provided (from local input), use them
+      if (files && files.length > 0) {
+        setUnsortedFiles(files);
+        setCloudFiles([]);
+      } else if (src === 'gdrive') {
+        // Fetch from Google Drive
+        const driveFiles = await fetchGoogleDrivePhotos();
+        const imageFiles = driveFiles.filter(f => f.mimeType.startsWith('image/'));
+        setCloudFiles(imageFiles);
+        
+        // Convert to FileItem format for display
+        const displayFiles: FileItem[] = imageFiles.map(f => ({
+          id: f.id,
+          url: f.thumbnailLink || f.webViewLink || '',
+          name: f.name,
+          date: new Date(f.modifiedTime || f.createdTime || Date.now()),
+          type: 'image',
+          size: f.size ? formatBytes(f.size) : '0 B'
+        }));
+        setUnsortedFiles(displayFiles);
+      } else if (src === 'onedrive') {
+        // Fetch from OneDrive
+        const onedriveFiles = await fetchOneDrivePhotos();
+        const imageFiles = onedriveFiles.filter(f => f.mimeType.startsWith('image/'));
+        setCloudFiles(imageFiles);
+        
+        // Convert to FileItem format for display
+        const displayFiles: FileItem[] = imageFiles.map(f => ({
+          id: f.id,
+          url: f.thumbnailLink || f.webViewLink || '',
+          name: f.name,
+          date: new Date(f.modifiedTime || f.createdTime || Date.now()),
+          type: 'image',
+          size: f.size ? formatBytes(f.size) : '0 B'
+        }));
+        setUnsortedFiles(displayFiles);
+      }
 
-    // Simulate scanning/loading delay
-    setTimeout(() => {
       setState('browsing');
-    }, 1500);
+    } catch (error: any) {
+      console.error('Error loading files:', error);
+      toast({
+        title: "Error loading files",
+        description: error.message || "Failed to load files from cloud storage",
+        variant: "destructive",
+      });
+      setState('picking');
+    }
   };
 
-  const handleSort = () => {
+  const handleSort = async () => {
     if (unsortedFiles.length === 0) return;
 
     setState('sorting');
     
-    // Simulate sorting animation delay and "physical move"
-    setTimeout(() => {
+    try {
+      // For cloud sources, perform actual file operations
+      if (source === 'gdrive' && cloudFiles.length > 0) {
+        await organizeGoogleDrivePhotos(cloudFiles);
+        toast({
+          title: "Photos organized!",
+          description: `Successfully organized ${cloudFiles.length} photos into year folders in Google Drive.`,
+        });
+      } else if (source === 'onedrive' && cloudFiles.length > 0) {
+        await organizeOneDrivePhotos(cloudFiles);
+        toast({
+          title: "Photos organized!",
+          description: `Successfully organized ${cloudFiles.length} photos into year folders in OneDrive.`,
+        });
+      } else {
+        // For local files, just simulate the move
+        toast({
+          title: "Photos organized!",
+          description: "Photos have been sorted by year (local preview only).",
+        });
+      }
+
+      // Update UI state
       setSortedFiles([...sortedFiles, ...unsortedFiles]);
-      setUnsortedFiles([]); // Clear the root folder
+      setUnsortedFiles([]);
+      setCloudFiles([]);
       setState('sorted');
-    }, 800);
+    } catch (error: any) {
+      console.error('Error organizing files:', error);
+      toast({
+        title: "Error organizing files",
+        description: error.message || "Failed to organize photos",
+        variant: "destructive",
+      });
+      setState('browsing');
+    }
   };
 
   const handleBackToRoot = () => {
@@ -56,7 +141,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background font-sans text-foreground selection:bg-primary/10 selection:text-primary">
-      
       {/* Header */}
       <header className="fixed top-0 w-full z-50 px-6 py-4 bg-background/80 backdrop-blur-md border-b border-border/40">
         <div className="max-w-7xl mx-auto flex items-center justify-between">

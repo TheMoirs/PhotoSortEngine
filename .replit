@@ -45,4 +45,4 @@ waitForPort = 5000
 
 [agent]
 mockupState = "FULLSTACK"
-integrations = ["google-drive:1.0.0"]
+integrations = ["google-drive:1.0.0", "onedrive:1.0.0"]
