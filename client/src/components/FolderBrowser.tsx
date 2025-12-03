@@ -113,24 +113,26 @@ export function FolderBrowser({
             <div>
               <h3 className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider">Photos in this folder</h3>
               <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {images.slice(0, 12).map((image) => (
-                  <div
-                    key={image.id}
-                    className="aspect-square rounded-lg overflow-hidden bg-secondary"
-                  >
-                    {image.thumbnailLink ? (
+                {images.slice(0, 12).map((image) => {
+                  const thumbnailUrl = source === 'gdrive' 
+                    ? `/api/gdrive/thumbnail/${image.id}` 
+                    : `/api/onedrive/thumbnail/${image.id}`;
+                  return (
+                    <div
+                      key={image.id}
+                      className="aspect-square rounded-lg overflow-hidden bg-secondary"
+                    >
                       <img 
-                        src={image.thumbnailLink} 
+                        src={thumbnailUrl} 
                         alt={image.name}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
                       />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Image className="w-6 h-6 text-muted-foreground" />
-                      </div>
-                    )}
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
                 {images.length > 12 && (
                   <div className="aspect-square rounded-lg bg-secondary flex items-center justify-center">
                     <span className="text-muted-foreground font-medium">+{images.length - 12} more</span>

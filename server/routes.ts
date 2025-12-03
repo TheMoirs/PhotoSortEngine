@@ -106,6 +106,48 @@ export async function registerRoutes(
     }
   });
 
+  // Proxy Google Drive thumbnails (they require auth)
+  app.get("/api/gdrive/thumbnail/:fileId", async (req, res) => {
+    try {
+      const { fileId } = req.params;
+      const size = req.query.size || 's220';
+      
+      const { getGoogleDriveClient } = await import("./cloud-storage");
+      const drive = await getGoogleDriveClient();
+      
+      const response = await drive.files.get({
+        fileId: fileId,
+        alt: 'media'
+      }, { responseType: 'stream' });
+
+      res.setHeader('Content-Type', response.headers['content-type'] || 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      (response.data as any).pipe(res);
+    } catch (error: any) {
+      console.error('Error fetching thumbnail:', error);
+      res.status(500).json({ error: 'Failed to fetch thumbnail' });
+    }
+  });
+
+  // Proxy OneDrive thumbnails
+  app.get("/api/onedrive/thumbnail/:fileId", async (req, res) => {
+    try {
+      const { fileId } = req.params;
+      
+      const { getOneDriveClient } = await import("./cloud-storage");
+      const client = await getOneDriveClient();
+      
+      const response = await client.api(`/me/drive/items/${fileId}/content`).get();
+      
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.send(response);
+    } catch (error: any) {
+      console.error('Error fetching OneDrive thumbnail:', error);
+      res.status(500).json({ error: 'Failed to fetch thumbnail' });
+    }
+  });
+
   // Health check
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });

@@ -123,10 +123,12 @@ export default function Home() {
     const imageFiles = allCloudFiles.filter(f => f.mimeType.startsWith('image/'));
     setCloudFiles(imageFiles);
     
-    // Convert to FileItem format for display
+    // Convert to FileItem format for display with proxied thumbnails
     const displayFiles: FileItem[] = imageFiles.map(f => ({
       id: f.id,
-      url: f.thumbnailLink || '',
+      url: source === 'gdrive' 
+        ? `/api/gdrive/thumbnail/${f.id}` 
+        : `/api/onedrive/thumbnail/${f.id}`,
       name: f.name,
       date: new Date(f.modifiedTime || f.createdTime || Date.now()),
       type: 'image',

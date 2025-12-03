@@ -104,11 +104,23 @@ export function PhotoGrid({ files, onSort, isSorting, hasSortedFiles, onViewFold
                 transition={{ duration: 0.4, delay: index * 0.05 }}
                 className="group relative aspect-square rounded-2xl overflow-hidden bg-secondary cursor-pointer"
               >
-                <img 
-                  src={file.url} 
-                  alt={file.name}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                />
+                {file.url ? (
+                  <img 
+                    src={file.url} 
+                    alt={file.name}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.onerror = null;
+                      target.src = '';
+                      target.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Folder className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                )}
                 
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4 flex flex-col justify-end">
                   <p className="text-white text-xs font-medium truncate">{file.name}</p>
