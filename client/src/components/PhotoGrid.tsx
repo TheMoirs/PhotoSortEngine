@@ -46,11 +46,11 @@ export function PhotoGrid({ files, onSort, isSorting, hasSortedFiles, onViewFold
             whileTap={{ scale: files.length > 0 ? 0.95 : 1 }}
             onClick={onSort}
             disabled={isSorting || files.length === 0}
-            className={`flex items-center gap-2 px-6 py-3 rounded-full font-medium shadow-lg transition-all ${
-              files.length === 0 
-                ? "bg-muted text-muted-foreground shadow-none cursor-not-allowed" 
-                : "bg-primary text-white shadow-primary/20 hover:shadow-xl hover:shadow-primary/30"
-            }`}
+            style={files.length === 0 
+              ? { backgroundColor: '#e5e7eb', color: '#6b7280' }
+              : { backgroundColor: '#3b82f6', color: '#ffffff' }
+            }
+            className="flex items-center gap-2 px-6 py-3 rounded-full font-medium shadow-lg transition-all"
           >
             {isSorting ? (
               "Organizing..."
