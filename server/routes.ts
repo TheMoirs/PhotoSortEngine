@@ -133,11 +133,14 @@ export async function registerRoutes(
         }
 
         console.log('Moving file to folder:', yearFolderId);
-        await moveOneDriveFile(file.id, yearFolderId);
-        results.push({ fileId: file.id, year, folderId: yearFolderId });
+        const moveResult = await moveOneDriveFile(file.id, yearFolderId);
+        console.log('Move result:', file.name, moveResult);
+        results.push({ fileId: file.id, year, folderId: yearFolderId, ...moveResult });
       }
 
-      res.json({ success: true, results, folders: Array.from(folderMap.entries()) });
+      const moved = results.filter(r => r.moved).length;
+      const skipped = results.filter(r => r.skipped).length;
+      res.json({ success: true, results, folders: Array.from(folderMap.entries()), moved, skipped });
     } catch (error: any) {
       console.error('Error organizing OneDrive photos:', error);
       res.status(500).json({ error: error.message || 'Failed to organize photos' });

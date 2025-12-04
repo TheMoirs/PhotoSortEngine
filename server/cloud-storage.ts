@@ -214,14 +214,30 @@ export async function listOneDrivePhotos(folderId: string = 'root'): Promise<Clo
     });
 }
 
-export async function moveOneDriveFile(fileId: string, targetFolderId: string): Promise<void> {
+export async function moveOneDriveFile(fileId: string, targetFolderId: string): Promise<{ moved: boolean; skipped: boolean; reason?: string }> {
   const client = await getOneDriveClient();
   
-  await client.api(`/me/drive/items/${fileId}`).patch({
-    parentReference: {
-      id: targetFolderId
+  try {
+    // First check if file is already in the target folder
+    const file = await client.api(`/me/drive/items/${fileId}`).get();
+    if (file.parentReference?.id === targetFolderId) {
+      return { moved: false, skipped: true, reason: 'File already in target folder' };
     }
-  });
+    
+    // Try to move the file
+    await client.api(`/me/drive/items/${fileId}`).patch({
+      parentReference: {
+        id: targetFolderId
+      }
+    });
+    return { moved: true, skipped: false };
+  } catch (error: any) {
+    // If name already exists, skip this file (duplicate in target)
+    if (error.code === 'nameAlreadyExists' || error.statusCode === 409) {
+      return { moved: false, skipped: true, reason: 'File with same name already exists in target folder' };
+    }
+    throw error;
+  }
 }
 
 export async function createOneDriveFolder(folderName: string, parentId: string = 'root'): Promise<string> {
