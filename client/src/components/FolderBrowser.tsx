@@ -28,7 +28,7 @@ export function FolderBrowser({
   const images = files.filter(f => f.mimeType.startsWith('image/'));
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-6">
+    <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 pb-24 sm:pb-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 mb-4 sm:mb-6 flex-wrap">
         <button
@@ -68,7 +68,7 @@ export function FolderBrowser({
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={onSelectFolder}
-            className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-primary text-white rounded-full font-medium shadow-lg shadow-primary/20 text-sm sm:text-base w-full sm:w-auto"
+            className="hidden sm:flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-primary text-white rounded-full font-medium shadow-lg shadow-primary/20 text-sm sm:text-base"
             data-testid="button-select-folder"
           >
             <Image className="w-4 h-4" />
@@ -76,6 +76,21 @@ export function FolderBrowser({
           </motion.button>
         )}
       </div>
+
+      {/* Mobile sticky footer button */}
+      {images.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-border sm:hidden z-50">
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={onSelectFolder}
+            className="flex items-center justify-center gap-2 w-full py-3 bg-primary text-white rounded-full font-medium shadow-lg"
+            data-testid="button-select-folder-mobile"
+          >
+            <Image className="w-4 h-4" />
+            Select This Folder ({images.length} photos)
+          </motion.button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-20">
