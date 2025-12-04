@@ -13,18 +13,21 @@ interface FolderBrowserProps {
 }
 
 const isImageFile = (file: CloudFile): boolean => {
-  // Check mimeType first
-  if (file.mimeType?.startsWith('image/')) return true;
+  // Check mimeType first (handle both string and undefined)
+  const mimeType = file.mimeType || '';
+  if (mimeType.startsWith('image/')) return true;
   
   // Fall back to extension check
-  const name = file.name?.toLowerCase() || '';
+  const name = (file.name || '').toLowerCase();
   const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.bmp', '.tiff', '.svg'];
   return imageExtensions.some(ext => name.endsWith(ext));
 };
 
 const isFolderFile = (file: CloudFile): boolean => {
-  return file.mimeType === 'application/vnd.google-apps.folder' || 
-         file.mimeType === 'application/vnd.folder';
+  const mimeType = file.mimeType || '';
+  return mimeType === 'application/vnd.google-apps.folder' || 
+         mimeType === 'application/vnd.folder' ||
+         mimeType.includes('folder');
 };
 
 export function FolderBrowser({ 
@@ -80,11 +83,11 @@ export function FolderBrowser({
           whileTap={images.length > 0 ? { scale: 0.95 } : {}}
           onClick={images.length > 0 ? onSelectFolder : undefined}
           disabled={images.length === 0}
-          className={`flex items-center justify-center gap-2 px-6 py-3 rounded-full font-medium shadow-lg text-base ${
-            images.length > 0 
-              ? 'bg-primary text-white shadow-primary/20 cursor-pointer' 
-              : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-          }`}
+          style={images.length > 0 
+            ? { backgroundColor: '#3b82f6', color: '#ffffff' }
+            : { backgroundColor: '#e5e7eb', color: '#6b7280' }
+          }
+          className="flex items-center justify-center gap-2 px-6 py-3 rounded-full font-medium shadow-lg text-base"
           data-testid="button-select-folder"
         >
           <Image className="w-5 h-5" />
