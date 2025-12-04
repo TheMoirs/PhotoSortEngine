@@ -239,17 +239,39 @@ export async function moveOneDriveFile(fileId: string, targetFolderId: string): 
       return { moved: false, skipped: true, reason: 'File already in target folder' };
     }
     
-    // Try to move the file
+    // Try to move the file with replace behavior for conflicts
     await client.api(`/me/drive/items/${fileId}`).patch({
       parentReference: {
         id: targetFolderId
-      }
+      },
+      '@microsoft.graph.conflictBehavior': 'replace'
     });
     return { moved: true, skipped: false };
   } catch (error: any) {
-    // If name already exists, skip this file (duplicate in target)
+    // If conflict still happens, try deleting existing and moving again
     if (error.code === 'nameAlreadyExists' || error.statusCode === 409) {
-      return { moved: false, skipped: true, reason: 'File with same name already exists in target folder' };
+      try {
+        // Get the file name
+        const file = await client.api(`/me/drive/items/${fileId}`).get();
+        const fileName = file.name;
+        
+        // Find and delete the existing file in target folder
+        const existingFile = await client.api(`/me/drive/items/${targetFolderId}:/${fileName}`).get();
+        if (existingFile && existingFile.id) {
+          await client.api(`/me/drive/items/${existingFile.id}`).delete();
+        }
+        
+        // Now move the file
+        await client.api(`/me/drive/items/${fileId}`).patch({
+          parentReference: {
+            id: targetFolderId
+          }
+        });
+        return { moved: true, skipped: false };
+      } catch (retryError) {
+        console.log('Failed to overwrite existing file:', retryError);
+        return { moved: false, skipped: true, reason: 'Could not overwrite existing file' };
+      }
     }
     throw error;
   }
