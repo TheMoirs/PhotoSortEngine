@@ -25,7 +25,7 @@ export function FolderBrowser({
     f.mimeType === 'application/vnd.google-apps.folder' || 
     f.mimeType === 'application/vnd.folder'
   );
-  const images = files.filter(f => f.mimeType.startsWith('image/'));
+  const images = files.filter(f => f.mimeType?.startsWith('image/'));
 
   return (
     <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 pb-24 sm:pb-6">
@@ -77,19 +77,23 @@ export function FolderBrowser({
         )}
       </div>
 
-      {/* Mobile sticky footer button */}
+      {/* Mobile sticky footer button - always visible when there are images */}
       {images.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-border sm:hidden z-50">
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={onSelectFolder}
-            className="flex items-center justify-center gap-2 w-full py-3 bg-primary text-white rounded-full font-medium shadow-lg"
-            data-testid="button-select-folder-mobile"
-          >
-            <Image className="w-4 h-4" />
-            Select This Folder ({images.length} photos)
-          </motion.button>
-        </div>
+        <>
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-border shadow-lg sm:hidden" style={{ zIndex: 9999 }}>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={onSelectFolder}
+              className="flex items-center justify-center gap-2 w-full py-3.5 bg-primary text-white rounded-full font-semibold text-base shadow-lg"
+              data-testid="button-select-folder-mobile"
+            >
+              <Image className="w-5 h-5" />
+              Select This Folder ({images.length} photos)
+            </motion.button>
+          </div>
+          {/* Spacer to prevent content from being hidden behind sticky button */}
+          <div className="h-20 sm:hidden" />
+        </>
       )}
 
       {isLoading ? (
