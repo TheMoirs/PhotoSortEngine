@@ -227,24 +227,57 @@ export async function moveOneDriveFile(fileId: string, targetFolderId: string): 
 export async function createOneDriveFolder(folderName: string, parentId: string = 'root'): Promise<string> {
   const client = await getOneDriveClient();
   
-  // First, check if folder already exists
-  const listPath = parentId === 'root' ? '/me/drive/root/children' : `/me/drive/items/${parentId}/children`;
-  const existingItems = await client.api(listPath).get();
+  // First, search for existing folder by name using a filter
+  const searchPath = parentId === 'root' 
+    ? `/me/drive/root/children` 
+    : `/me/drive/items/${parentId}/children`;
   
-  const existingFolder = existingItems.value?.find(
-    (item: any) => item.folder && item.name === folderName
-  );
-  
-  if (existingFolder) {
-    return existingFolder.id;
+  try {
+    // Use filter to find folder by exact name
+    const searchResult = await client.api(searchPath)
+      .filter(`name eq '${folderName}'`)
+      .get();
+    
+    const existingFolder = searchResult.value?.find(
+      (item: any) => item.folder
+    );
+    
+    if (existingFolder) {
+      return existingFolder.id;
+    }
+  } catch (searchError) {
+    // If filter fails, try listing all and searching
+    console.log('Filter search failed, trying full list:', searchError);
   }
   
-  // Create new folder if it doesn't exist
-  const response = await client.api(listPath).post({
-    name: folderName,
-    folder: {},
-    '@microsoft.graph.conflictBehavior': 'fail'
-  });
-
-  return response.id;
+  // Try to create the folder, but handle "already exists" error gracefully
+  const createPath = parentId === 'root' ? '/me/drive/root/children' : `/me/drive/items/${parentId}/children`;
+  
+  try {
+    const response = await client.api(createPath).post({
+      name: folderName,
+      folder: {},
+      '@microsoft.graph.conflictBehavior': 'fail'
+    });
+    return response.id;
+  } catch (createError: any) {
+    // If creation fails because name exists, try to find and return the existing folder
+    if (createError.code === 'nameAlreadyExists' || createError.statusCode === 409) {
+      // List all items and find the folder
+      let allItems: any[] = [];
+      let nextLink = searchPath;
+      
+      while (nextLink) {
+        const result = await client.api(nextLink).get();
+        allItems = allItems.concat(result.value || []);
+        nextLink = result['@odata.nextLink'] || null;
+      }
+      
+      const folder = allItems.find((item: any) => item.folder && item.name === folderName);
+      if (folder) {
+        return folder.id;
+      }
+    }
+    throw createError;
+  }
 }
