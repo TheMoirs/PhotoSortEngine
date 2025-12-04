@@ -146,6 +146,17 @@ export async function moveGoogleDriveFile(fileId: string, targetFolderId: string
 export async function createGoogleDriveFolder(folderName: string, parentId: string = 'root'): Promise<string> {
   const drive = await getGoogleDriveClient();
   
+  // First, check if folder already exists
+  const existingFolders = await drive.files.list({
+    q: `'${parentId}' in parents and name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+    fields: 'files(id, name)',
+  });
+  
+  if (existingFolders.data.files && existingFolders.data.files.length > 0) {
+    return existingFolders.data.files[0].id!;
+  }
+  
+  // Create new folder if it doesn't exist
   const response = await drive.files.create({
     requestBody: {
       name: folderName,
@@ -216,11 +227,23 @@ export async function moveOneDriveFile(fileId: string, targetFolderId: string): 
 export async function createOneDriveFolder(folderName: string, parentId: string = 'root'): Promise<string> {
   const client = await getOneDriveClient();
   
-  const path = parentId === 'root' ? '/me/drive/root/children' : `/me/drive/items/${parentId}/children`;
-  const response = await client.api(path).post({
+  // First, check if folder already exists
+  const listPath = parentId === 'root' ? '/me/drive/root/children' : `/me/drive/items/${parentId}/children`;
+  const existingItems = await client.api(listPath).get();
+  
+  const existingFolder = existingItems.value?.find(
+    (item: any) => item.folder && item.name === folderName
+  );
+  
+  if (existingFolder) {
+    return existingFolder.id;
+  }
+  
+  // Create new folder if it doesn't exist
+  const response = await client.api(listPath).post({
     name: folderName,
     folder: {},
-    '@microsoft.graph.conflictBehavior': 'rename'
+    '@microsoft.graph.conflictBehavior': 'fail'
   });
 
   return response.id;
