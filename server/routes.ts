@@ -49,7 +49,19 @@ export async function registerRoutes(
         return res.status(400).json({ error: 'Files array is required' });
       }
 
+      // First, get existing folders in the parent directory
+      const existingFiles = await listGoogleDrivePhotos(parentFolderId || 'root');
+      const existingFolders = existingFiles.filter(f => f.mimeType === 'application/vnd.google-apps.folder');
+      
+      // Build a map of existing year folders
       const folderMap = new Map<string, string>();
+      for (const folder of existingFolders) {
+        // Check if folder name is a year (4 digits)
+        if (/^\d{4}$/.test(folder.name)) {
+          folderMap.set(folder.name, folder.id);
+        }
+      }
+
       const results = [];
 
       for (const file of files) {
@@ -58,6 +70,7 @@ export async function registerRoutes(
         
         let yearFolderId = folderMap.get(year);
         if (!yearFolderId) {
+          // Only create folder if it doesn't exist
           yearFolderId = await createGoogleDriveFolder(year, parentFolderId || 'root');
           folderMap.set(year, yearFolderId);
         }
@@ -82,7 +95,19 @@ export async function registerRoutes(
         return res.status(400).json({ error: 'Files array is required' });
       }
 
+      // First, get existing folders in the parent directory
+      const existingFiles = await listOneDrivePhotos(parentFolderId || 'root');
+      const existingFolders = existingFiles.filter(f => f.mimeType === 'application/vnd.folder');
+      
+      // Build a map of existing year folders
       const folderMap = new Map<string, string>();
+      for (const folder of existingFolders) {
+        // Check if folder name is a year (4 digits)
+        if (/^\d{4}$/.test(folder.name)) {
+          folderMap.set(folder.name, folder.id);
+        }
+      }
+
       const results = [];
 
       for (const file of files) {
@@ -91,6 +116,7 @@ export async function registerRoutes(
         
         let yearFolderId = folderMap.get(year);
         if (!yearFolderId) {
+          // Only create folder if it doesn't exist
           yearFolderId = await createOneDriveFolder(year, parentFolderId || 'root');
           folderMap.set(year, yearFolderId);
         }
