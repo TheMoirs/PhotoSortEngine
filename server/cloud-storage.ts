@@ -164,18 +164,43 @@ export async function listOneDrivePhotos(folderId: string = 'root'): Promise<Clo
   const path = folderId === 'root' ? '/me/drive/root/children' : `/me/drive/items/${folderId}/children`;
   const response = await client.api(path).get();
 
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.heic', '.heif', '.tiff', '.tif'];
+  
+  const isImage = (item: any): boolean => {
+    // Check mimeType first
+    if (item.file?.mimeType?.startsWith('image/')) return true;
+    // Fall back to extension check
+    const name = item.name?.toLowerCase() || '';
+    return imageExtensions.some(ext => name.endsWith(ext));
+  };
+
   return response.value
-    .filter((item: any) => item.file?.mimeType?.startsWith('image/') || item.folder)
-    .map((item: any) => ({
-      id: item.id,
-      name: item.name,
-      mimeType: item.file?.mimeType || 'application/vnd.folder',
-      createdTime: item.createdDateTime,
-      modifiedTime: item.lastModifiedDateTime,
-      size: item.size,
-      thumbnailLink: item.thumbnails?.[0]?.large?.url,
-      webViewLink: item.webUrl,
-    }));
+    .filter((item: any) => isImage(item) || item.folder)
+    .map((item: any) => {
+      const name = item.name?.toLowerCase() || '';
+      let mimeType = item.file?.mimeType;
+      
+      // Infer mimeType from extension if not provided
+      if (!mimeType && !item.folder) {
+        if (name.endsWith('.jpg') || name.endsWith('.jpeg')) mimeType = 'image/jpeg';
+        else if (name.endsWith('.png')) mimeType = 'image/png';
+        else if (name.endsWith('.gif')) mimeType = 'image/gif';
+        else if (name.endsWith('.webp')) mimeType = 'image/webp';
+        else if (name.endsWith('.heic') || name.endsWith('.heif')) mimeType = 'image/heic';
+        else mimeType = 'image/jpeg'; // default for images
+      }
+      
+      return {
+        id: item.id,
+        name: item.name,
+        mimeType: mimeType || 'application/vnd.folder',
+        createdTime: item.createdDateTime,
+        modifiedTime: item.lastModifiedDateTime,
+        size: item.size,
+        thumbnailLink: item.thumbnails?.[0]?.large?.url,
+        webViewLink: item.webUrl,
+      };
+    });
 }
 
 export async function moveOneDriveFile(fileId: string, targetFolderId: string): Promise<void> {
