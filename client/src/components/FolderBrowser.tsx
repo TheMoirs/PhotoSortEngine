@@ -68,11 +68,11 @@ export function FolderBrowser({
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={onSelectFolder}
-            className="hidden sm:flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-primary text-white rounded-full font-medium shadow-lg shadow-primary/20 text-sm sm:text-base"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white rounded-full font-medium shadow-lg shadow-primary/20 text-base"
             data-testid="button-select-folder"
           >
-            <Image className="w-4 h-4" />
-            Select Folder ({images.length})
+            <Image className="w-5 h-5" />
+            Select This Folder ({images.length} photos)
           </motion.button>
         )}
       </div>

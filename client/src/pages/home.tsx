@@ -145,16 +145,24 @@ export default function Home() {
     
     try {
       if (source === 'gdrive' && cloudFiles.length > 0) {
-        await organizeGoogleDrivePhotos(cloudFiles, currentFolderId);
+        const result = await organizeGoogleDrivePhotos(cloudFiles, currentFolderId);
+        const moved = result.moved || cloudFiles.length;
+        const skipped = result.skipped || 0;
         toast({
           title: "Photos organized!",
-          description: `Successfully organized ${cloudFiles.length} photos into year folders in Google Drive.`,
+          description: skipped > 0 
+            ? `Moved ${moved} photos to year folders. ${skipped} already in correct folders.`
+            : `Successfully moved ${moved} photos into year folders in Google Drive.`,
         });
       } else if (source === 'onedrive' && cloudFiles.length > 0) {
-        await organizeOneDrivePhotos(cloudFiles, currentFolderId);
+        const result = await organizeOneDrivePhotos(cloudFiles, currentFolderId);
+        const moved = result.moved || 0;
+        const skipped = result.skipped || 0;
         toast({
           title: "Photos organized!",
-          description: `Successfully organized ${cloudFiles.length} photos into year folders in OneDrive.`,
+          description: skipped > 0 
+            ? `Moved ${moved} photos to year folders. ${skipped} already in correct folders.`
+            : `Successfully moved ${moved} photos into year folders in OneDrive.`,
         });
       } else {
         toast({

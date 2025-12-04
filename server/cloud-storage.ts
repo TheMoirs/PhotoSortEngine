@@ -125,22 +125,37 @@ export async function listGoogleDrivePhotos(folderId: string = 'root'): Promise<
   })) || [];
 }
 
-export async function moveGoogleDriveFile(fileId: string, targetFolderId: string): Promise<void> {
+export async function moveGoogleDriveFile(fileId: string, targetFolderId: string): Promise<{ moved: boolean; skipped: boolean; reason?: string }> {
   const drive = await getGoogleDriveClient();
   
-  const file = await drive.files.get({
-    fileId: fileId,
-    fields: 'parents'
-  });
+  try {
+    const file = await drive.files.get({
+      fileId: fileId,
+      fields: 'parents'
+    });
 
-  const previousParents = file.data.parents?.join(',');
+    // Check if already in target folder
+    if (file.data.parents?.includes(targetFolderId)) {
+      return { moved: false, skipped: true, reason: 'File already in target folder' };
+    }
 
-  await drive.files.update({
-    fileId: fileId,
-    addParents: targetFolderId,
-    removeParents: previousParents,
-    fields: 'id, parents'
-  });
+    const previousParents = file.data.parents?.join(',');
+
+    await drive.files.update({
+      fileId: fileId,
+      addParents: targetFolderId,
+      removeParents: previousParents,
+      fields: 'id, parents'
+    });
+    
+    return { moved: true, skipped: false };
+  } catch (error: any) {
+    // Handle duplicate name errors
+    if (error.code === 409 || error.message?.includes('already exists')) {
+      return { moved: false, skipped: true, reason: 'File with same name already exists in target folder' };
+    }
+    throw error;
+  }
 }
 
 export async function createGoogleDriveFolder(folderName: string, parentId: string = 'root'): Promise<string> {
