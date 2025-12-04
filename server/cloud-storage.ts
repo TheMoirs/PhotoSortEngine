@@ -227,30 +227,24 @@ export async function moveOneDriveFile(fileId: string, targetFolderId: string): 
 export async function createOneDriveFolder(folderName: string, parentId: string = 'root'): Promise<string> {
   const client = await getOneDriveClient();
   
-  // First, search for existing folder by name using a filter
-  const searchPath = parentId === 'root' 
-    ? `/me/drive/root/children` 
-    : `/me/drive/items/${parentId}/children`;
-  
+  // First, try to get the folder by path (most reliable method)
   try {
-    // Use filter to find folder by exact name
-    const searchResult = await client.api(searchPath)
-      .filter(`name eq '${folderName}'`)
-      .get();
+    const pathQuery = parentId === 'root' 
+      ? `/me/drive/root:/${folderName}` 
+      : `/me/drive/items/${parentId}:/${folderName}`;
     
-    const existingFolder = searchResult.value?.find(
-      (item: any) => item.folder
-    );
-    
-    if (existingFolder) {
-      return existingFolder.id;
+    const existing = await client.api(pathQuery).get();
+    if (existing && existing.id && existing.folder) {
+      return existing.id;
     }
-  } catch (searchError) {
-    // If filter fails, try listing all and searching
-    console.log('Filter search failed, trying full list:', searchError);
+  } catch (pathError: any) {
+    // Item doesn't exist by path, continue to create
+    if (pathError.statusCode !== 404) {
+      console.log('Path lookup error:', pathError.message);
+    }
   }
   
-  // Try to create the folder, but handle "already exists" error gracefully
+  // Try to create the folder
   const createPath = parentId === 'root' ? '/me/drive/root/children' : `/me/drive/items/${parentId}/children`;
   
   try {
@@ -261,21 +255,19 @@ export async function createOneDriveFolder(folderName: string, parentId: string 
     });
     return response.id;
   } catch (createError: any) {
-    // If creation fails because name exists, try to find and return the existing folder
+    // If creation fails because name exists, try path lookup again
     if (createError.code === 'nameAlreadyExists' || createError.statusCode === 409) {
-      // List all items and find the folder
-      let allItems: any[] = [];
-      let nextLink = searchPath;
-      
-      while (nextLink) {
-        const result = await client.api(nextLink).get();
-        allItems = allItems.concat(result.value || []);
-        nextLink = result['@odata.nextLink'] || null;
-      }
-      
-      const folder = allItems.find((item: any) => item.folder && item.name === folderName);
-      if (folder) {
-        return folder.id;
+      try {
+        const pathQuery = parentId === 'root' 
+          ? `/me/drive/root:/${folderName}` 
+          : `/me/drive/items/${parentId}:/${folderName}`;
+        
+        const existing = await client.api(pathQuery).get();
+        if (existing && existing.id) {
+          return existing.id;
+        }
+      } catch (retryError) {
+        console.log('Retry path lookup failed:', retryError);
       }
     }
     throw createError;
