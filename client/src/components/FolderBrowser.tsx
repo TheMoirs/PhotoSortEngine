@@ -80,19 +80,19 @@ export function FolderBrowser({
       {/* Mobile sticky footer button - always visible when there are images */}
       {images.length > 0 && (
         <>
-          <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-border shadow-lg sm:hidden" style={{ zIndex: 9999 }}>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-2xl sm:hidden" style={{ zIndex: 9999 }}>
+            <button
               onClick={onSelectFolder}
-              className="flex items-center justify-center gap-2 w-full py-3.5 bg-primary text-white rounded-full font-semibold text-base shadow-lg"
+              className="flex items-center justify-center gap-2 w-full py-4 rounded-full font-semibold text-base shadow-lg"
+              style={{ backgroundColor: '#3b82f6', color: '#ffffff' }}
               data-testid="button-select-folder-mobile"
             >
-              <Image className="w-5 h-5" />
-              Select This Folder ({images.length} photos)
-            </motion.button>
+              <Image className="w-5 h-5" style={{ color: '#ffffff' }} />
+              <span style={{ color: '#ffffff' }}>Select This Folder ({images.length} photos)</span>
+            </button>
           </div>
           {/* Spacer to prevent content from being hidden behind sticky button */}
-          <div className="h-20 sm:hidden" />
+          <div className="h-24 sm:hidden" />
         </>
       )}
 
