@@ -75,18 +75,23 @@ export function FolderBrowser({
           </p>
         </div>
 
-        {images.length > 0 && (
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={onSelectFolder}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white rounded-full font-medium shadow-lg shadow-primary/20 text-base"
-            data-testid="button-select-folder"
-          >
-            <Image className="w-5 h-5" />
-            Select This Folder ({images.length} photos)
-          </motion.button>
-        )}
+        <motion.button
+          whileHover={images.length > 0 ? { scale: 1.05 } : {}}
+          whileTap={images.length > 0 ? { scale: 0.95 } : {}}
+          onClick={images.length > 0 ? onSelectFolder : undefined}
+          disabled={images.length === 0}
+          className={`flex items-center justify-center gap-2 px-6 py-3 rounded-full font-medium shadow-lg text-base ${
+            images.length > 0 
+              ? 'bg-primary text-white shadow-primary/20 cursor-pointer' 
+              : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+          }`}
+          data-testid="button-select-folder"
+        >
+          <Image className="w-5 h-5" />
+          {images.length > 0 
+            ? `Select This Folder (${images.length} photos)` 
+            : 'No photos in this folder'}
+        </motion.button>
       </div>
 
       {/* Mobile sticky footer button - always visible when there are images */}
