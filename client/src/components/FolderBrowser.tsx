@@ -12,6 +12,21 @@ interface FolderBrowserProps {
   source: string;
 }
 
+const isImageFile = (file: CloudFile): boolean => {
+  // Check mimeType first
+  if (file.mimeType?.startsWith('image/')) return true;
+  
+  // Fall back to extension check
+  const name = file.name?.toLowerCase() || '';
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.bmp', '.tiff', '.svg'];
+  return imageExtensions.some(ext => name.endsWith(ext));
+};
+
+const isFolderFile = (file: CloudFile): boolean => {
+  return file.mimeType === 'application/vnd.google-apps.folder' || 
+         file.mimeType === 'application/vnd.folder';
+};
+
 export function FolderBrowser({ 
   files, 
   currentPath, 
@@ -21,11 +36,8 @@ export function FolderBrowser({
   isLoading,
   source
 }: FolderBrowserProps) {
-  const folders = files.filter(f => 
-    f.mimeType === 'application/vnd.google-apps.folder' || 
-    f.mimeType === 'application/vnd.folder'
-  );
-  const images = files.filter(f => f.mimeType?.startsWith('image/'));
+  const folders = files.filter(isFolderFile);
+  const images = files.filter(f => !isFolderFile(f) && isImageFile(f));
 
   return (
     <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 pb-24 sm:pb-6">
