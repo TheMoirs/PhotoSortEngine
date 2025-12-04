@@ -91,6 +91,9 @@ export async function registerRoutes(
     try {
       const { files, parentFolderId } = req.body;
       
+      console.log('Organize request - parentFolderId:', parentFolderId);
+      console.log('Organize request - files count:', files?.length);
+      
       if (!files || !Array.isArray(files)) {
         return res.status(400).json({ error: 'Files array is required' });
       }
@@ -99,14 +102,19 @@ export async function registerRoutes(
       const existingFiles = await listOneDrivePhotos(parentFolderId || 'root');
       const existingFolders = existingFiles.filter(f => f.mimeType === 'application/vnd.folder');
       
+      console.log('Found existing folders:', existingFolders.length);
+      
       // Build a map of existing year folders
       const folderMap = new Map<string, string>();
       for (const folder of existingFolders) {
         // Check if folder name is a year (4 digits)
         if (/^\d{4}$/.test(folder.name)) {
           folderMap.set(folder.name, folder.id);
+          console.log('Added year folder to map:', folder.name, '->', folder.id);
         }
       }
+      
+      console.log('Year folders in map:', Array.from(folderMap.keys()));
 
       const results = [];
 
@@ -114,13 +122,17 @@ export async function registerRoutes(
         const date = new Date(file.modifiedTime || file.createdTime);
         const year = date.getFullYear().toString();
         
+        console.log('Processing file:', file.name, 'year:', year, 'exists in map:', folderMap.has(year));
+        
         let yearFolderId = folderMap.get(year);
         if (!yearFolderId) {
+          console.log('Creating folder for year:', year);
           // Only create folder if it doesn't exist
           yearFolderId = await createOneDriveFolder(year, parentFolderId || 'root');
           folderMap.set(year, yearFolderId);
         }
 
+        console.log('Moving file to folder:', yearFolderId);
         await moveOneDriveFile(file.id, yearFolderId);
         results.push({ fileId: file.id, year, folderId: yearFolderId });
       }
