@@ -120,12 +120,13 @@ export default function Home() {
   };
 
   const handleSelectCloudFolder = () => {
-    const isImageFile = (f: CloudFile): boolean => {
+    const isMediaFile = (f: CloudFile): boolean => {
       const mimeType = f.mimeType || '';
-      if (mimeType.startsWith('image/')) return true;
+      if (mimeType.startsWith('image/') || mimeType.startsWith('video/')) return true;
       const name = (f.name || '').toLowerCase();
       const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.bmp', '.tiff', '.svg'];
-      return imageExtensions.some(ext => name.endsWith(ext));
+      const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.3gp', '.mpeg', '.mpg'];
+      return imageExtensions.some(ext => name.endsWith(ext)) || videoExtensions.some(ext => name.endsWith(ext));
     };
     const isFolderFile = (f: CloudFile): boolean => {
       const mimeType = f.mimeType || '';
@@ -133,20 +134,26 @@ export default function Home() {
              mimeType === 'application/vnd.folder' ||
              mimeType.includes('folder');
     };
-    const imageFiles = allCloudFiles.filter(f => !isFolderFile(f) && isImageFile(f));
-    setCloudFiles(imageFiles);
+    const mediaFiles = allCloudFiles.filter(f => !isFolderFile(f) && isMediaFile(f));
+    setCloudFiles(mediaFiles);
     
     // Convert to FileItem format for display with proxied thumbnails
-    const displayFiles: FileItem[] = imageFiles.map(f => ({
-      id: f.id,
-      url: source === 'gdrive' 
-        ? `/api/gdrive/thumbnail/${f.id}` 
-        : `/api/onedrive/thumbnail/${f.id}`,
-      name: f.name,
-      date: new Date(f.modifiedTime || f.createdTime || Date.now()),
-      type: 'image',
-      size: f.size ? formatBytes(f.size) : '0 B'
-    }));
+    const displayFiles: FileItem[] = mediaFiles.map(f => {
+      const mimeType = f.mimeType || '';
+      const isVideo = mimeType.startsWith('video/') || 
+        ['.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.3gp', '.mpeg', '.mpg']
+          .some(ext => (f.name || '').toLowerCase().endsWith(ext));
+      return {
+        id: f.id,
+        url: source === 'gdrive' 
+          ? `/api/gdrive/thumbnail/${f.id}` 
+          : `/api/onedrive/thumbnail/${f.id}`,
+        name: f.name,
+        date: new Date(f.modifiedTime || f.createdTime || Date.now()),
+        type: isVideo ? 'video' : 'image',
+        size: f.size ? formatBytes(f.size) : '0 B'
+      };
+    });
     setUnsortedFiles(displayFiles);
     setState('browsing');
   };
@@ -162,24 +169,24 @@ export default function Home() {
         const moved = result.moved || cloudFiles.length;
         const skipped = result.skipped || 0;
         toast({
-          title: "Photos organized!",
+          title: "Media organized!",
           description: skipped > 0 
-            ? `Moved ${moved} photos to year folders. ${skipped} already in correct folders.`
-            : `Successfully moved ${moved} photos into year folders in Google Drive.`,
+            ? `Moved ${moved} files to year folders. ${skipped} already in correct folders.`
+            : `Successfully moved ${moved} photos/videos into year folders in Google Drive.`,
         });
       } else if (source === 'onedrive' && cloudFiles.length > 0) {
         const result = await organizeOneDrivePhotos(cloudFiles, currentFolderId);
         const moved = result.moved || 0;
         const skipped = result.skipped || 0;
         toast({
-          title: "Photos organized!",
+          title: "Media organized!",
           description: skipped > 0 
-            ? `Moved ${moved} photos to year folders. ${skipped} already in correct folders.`
-            : `Successfully moved ${moved} photos into year folders in OneDrive.`,
+            ? `Moved ${moved} files to year folders. ${skipped} already in correct folders.`
+            : `Successfully moved ${moved} photos/videos into year folders in OneDrive.`,
         });
       } else {
         toast({
-          title: "Photos organized!",
+          title: "Media organized!",
           description: "Photos have been sorted by year (local preview only).",
         });
       }

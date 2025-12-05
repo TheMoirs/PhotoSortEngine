@@ -36,17 +36,29 @@ export function FilePicker({ onSelectSource }: FilePickerProps) {
     if (files && files.length > 0) {
       setIsReading(true);
       
-      // Convert FileList to our FileItem format
+      const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.3gp', '.mpeg', '.mpg'];
+      
+      const isMediaFile = (file: File): boolean => {
+        if (file.type.startsWith('image/') || file.type.startsWith('video/')) return true;
+        const name = file.name.toLowerCase();
+        return videoExtensions.some(ext => name.endsWith(ext));
+      };
+      
+      // Convert FileList to our FileItem format (photos and videos)
       const fileItems: FileItem[] = Array.from(files)
-        .filter(file => file.type.startsWith('image/'))
-        .map((file, index) => ({
-          id: `local-${index}-${Date.now()}`,
-          url: URL.createObjectURL(file),
-          name: file.name,
-          date: new Date(file.lastModified),
-          type: 'image',
-          size: formatBytes(file.size)
-        }));
+        .filter(isMediaFile)
+        .map((file, index) => {
+          const isVideo = file.type.startsWith('video/') || 
+            videoExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+          return {
+            id: `local-${index}-${Date.now()}`,
+            url: URL.createObjectURL(file),
+            name: file.name,
+            date: new Date(file.lastModified),
+            type: isVideo ? 'video' : 'image',
+            size: formatBytes(file.size)
+          };
+        });
 
       // Simulate a small delay for UX
       setTimeout(() => {
@@ -82,10 +94,10 @@ export function FilePicker({ onSelectSource }: FilePickerProps) {
           <FolderOpen className="w-6 h-6 sm:w-7 sm:h-7 text-primary" />
         </div>
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary tracking-tight">
-          Sort Your Photos
+          Sort Your Media
         </h1>
         <p className="text-muted-foreground text-sm sm:text-base max-w-sm mx-auto">
-          Choose a source to organize your photos by year
+          Choose a source to organize your photos and videos by year
         </p>
       </motion.div>
 

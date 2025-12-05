@@ -11,7 +11,7 @@ export interface FileItem {
   url: string;
   name: string;
   date: Date;
-  type: 'image';
+  type: 'image' | 'video';
   size: string;
 }
 

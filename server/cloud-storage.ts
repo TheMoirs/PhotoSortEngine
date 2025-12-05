@@ -110,10 +110,10 @@ export async function listGoogleDrivePhotos(folderId: string = 'root'): Promise<
   const allFiles: CloudFile[] = [];
   let pageToken: string | undefined = undefined;
   
-  // Paginate through all results
+  // Paginate through all results - include both images and videos
   do {
     const response: any = await drive.files.list({
-      q: `'${folderId}' in parents and (mimeType contains 'image/' or mimeType = 'application/vnd.google-apps.folder') and trashed = false`,
+      q: `'${folderId}' in parents and (mimeType contains 'image/' or mimeType contains 'video/' or mimeType = 'application/vnd.google-apps.folder') and trashed = false`,
       fields: 'nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, size, thumbnailLink, webViewLink)',
       pageSize: 1000,
       pageToken: pageToken,
@@ -212,15 +212,17 @@ export async function listOneDrivePhotos(folderId: string = 'root'): Promise<Clo
   }
 
   const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.heic', '.heif', '.tiff', '.tif'];
+  const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.3gp', '.mpeg', '.mpg'];
   
-  const isImage = (item: any): boolean => {
-    if (item.file?.mimeType?.startsWith('image/')) return true;
+  const isMediaFile = (item: any): boolean => {
+    const mimeType = item.file?.mimeType || '';
+    if (mimeType.startsWith('image/') || mimeType.startsWith('video/')) return true;
     const name = item.name?.toLowerCase() || '';
-    return imageExtensions.some(ext => name.endsWith(ext));
+    return imageExtensions.some(ext => name.endsWith(ext)) || videoExtensions.some(ext => name.endsWith(ext));
   };
 
   return allItems
-    .filter((item: any) => isImage(item) || item.folder)
+    .filter((item: any) => isMediaFile(item) || item.folder)
     .map((item: any) => {
       const name = item.name?.toLowerCase() || '';
       let mimeType = item.file?.mimeType;
@@ -231,6 +233,12 @@ export async function listOneDrivePhotos(folderId: string = 'root'): Promise<Clo
         else if (name.endsWith('.gif')) mimeType = 'image/gif';
         else if (name.endsWith('.webp')) mimeType = 'image/webp';
         else if (name.endsWith('.heic') || name.endsWith('.heif')) mimeType = 'image/heic';
+        else if (name.endsWith('.mp4')) mimeType = 'video/mp4';
+        else if (name.endsWith('.mov')) mimeType = 'video/quicktime';
+        else if (name.endsWith('.avi')) mimeType = 'video/x-msvideo';
+        else if (name.endsWith('.mkv')) mimeType = 'video/x-matroska';
+        else if (name.endsWith('.webm')) mimeType = 'video/webm';
+        else if (name.endsWith('.m4v')) mimeType = 'video/x-m4v';
         else mimeType = 'image/jpeg';
       }
       

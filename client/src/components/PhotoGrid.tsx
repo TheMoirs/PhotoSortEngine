@@ -1,7 +1,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { FileItem } from "@/lib/mockData";
-import { LayoutGrid, SortAsc, Folder, FolderOpen, Check, Home, ChevronRight } from "lucide-react";
+import { LayoutGrid, SortAsc, Folder, FolderOpen, Check, Home, ChevronRight, Play } from "lucide-react";
 import { format } from "date-fns";
 
 interface SubfolderInfo {
@@ -86,9 +86,9 @@ export function PhotoGrid({ files, onSort, isSorting, hasSortedFiles, onViewFold
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
             <Check className="w-8 h-8 text-green-600" />
           </div>
-          <h3 className="text-xl font-semibold mb-2">All photos sorted!</h3>
+          <h3 className="text-xl font-semibold mb-2">All media sorted!</h3>
           <p className="text-muted-foreground max-w-md mb-6">
-            Your photos have been moved to their respective year folders.
+            Your photos and videos have been moved to their respective year folders.
           </p>
           
           <button 
@@ -160,6 +160,14 @@ export function PhotoGrid({ files, onSort, isSorting, hasSortedFiles, onViewFold
                   <p className="text-white text-xs font-medium truncate">{file.name}</p>
                   <p className="text-white/70 text-[10px]">{format(file.date, "MMM d, yyyy")}</p>
                 </div>
+                
+                {file.type === 'video' && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-12 h-12 bg-black/50 backdrop-blur-sm rounded-full flex items-center justify-center">
+                      <Play className="w-6 h-6 text-white fill-white ml-1" />
+                    </div>
+                  </div>
+                )}
                 
                 <div className="absolute top-3 right-3 p-1.5 bg-black/20 backdrop-blur-md rounded-full opacity-0 group-hover:opacity-100 transition-opacity delay-75">
                   <Folder className="w-3 h-3 text-white" />

@@ -12,15 +12,14 @@ interface FolderBrowserProps {
   source: string;
 }
 
-const isImageFile = (file: CloudFile): boolean => {
-  // Check mimeType first (handle both string and undefined)
+const isMediaFile = (file: CloudFile): boolean => {
   const mimeType = file.mimeType || '';
-  if (mimeType.startsWith('image/')) return true;
+  if (mimeType.startsWith('image/') || mimeType.startsWith('video/')) return true;
   
-  // Fall back to extension check
   const name = (file.name || '').toLowerCase();
   const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.bmp', '.tiff', '.svg'];
-  return imageExtensions.some(ext => name.endsWith(ext));
+  const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.3gp', '.mpeg', '.mpg'];
+  return imageExtensions.some(ext => name.endsWith(ext)) || videoExtensions.some(ext => name.endsWith(ext));
 };
 
 const isFolderFile = (file: CloudFile): boolean => {
@@ -40,7 +39,7 @@ export function FolderBrowser({
   source
 }: FolderBrowserProps) {
   const folders = files.filter(isFolderFile);
-  const images = files.filter(f => !isFolderFile(f) && isImageFile(f));
+  const mediaFiles = files.filter(f => !isFolderFile(f) && isMediaFile(f));
 
   return (
     <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 pb-24 sm:pb-6">
@@ -74,16 +73,16 @@ export function FolderBrowser({
         <div>
           <h2 className="text-xl sm:text-2xl font-bold">Browse Folders</h2>
           <p className="text-muted-foreground text-xs sm:text-sm">
-            {folders.length} folders, {images.length} photos
+            {folders.length} folders, {mediaFiles.length} photos/videos
           </p>
         </div>
 
         <motion.button
-          whileHover={images.length > 0 ? { scale: 1.05 } : {}}
-          whileTap={images.length > 0 ? { scale: 0.95 } : {}}
-          onClick={images.length > 0 ? onSelectFolder : undefined}
-          disabled={images.length === 0}
-          style={images.length > 0 
+          whileHover={mediaFiles.length > 0 ? { scale: 1.05 } : {}}
+          whileTap={mediaFiles.length > 0 ? { scale: 0.95 } : {}}
+          onClick={mediaFiles.length > 0 ? onSelectFolder : undefined}
+          disabled={mediaFiles.length === 0}
+          style={mediaFiles.length > 0 
             ? { backgroundColor: '#3b82f6', color: '#ffffff' }
             : { backgroundColor: '#e5e7eb', color: '#6b7280' }
           }
@@ -91,14 +90,14 @@ export function FolderBrowser({
           data-testid="button-select-folder"
         >
           <Image className="w-5 h-5" />
-          {images.length > 0 
-            ? `Select This Folder (${images.length} photos)` 
-            : 'No photos in this folder'}
+          {mediaFiles.length > 0 
+            ? `Select This Folder (${mediaFiles.length} files)` 
+            : 'No media in this folder'}
         </motion.button>
       </div>
 
-      {/* Mobile sticky footer button - always visible when there are images */}
-      {images.length > 0 && (
+      {/* Mobile sticky footer button - always visible when there are media files */}
+      {mediaFiles.length > 0 && (
         <>
           <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-2xl sm:hidden" style={{ zIndex: 9999 }}>
             <button
@@ -108,7 +107,7 @@ export function FolderBrowser({
               data-testid="button-select-folder-mobile"
             >
               <Image className="w-5 h-5" style={{ color: '#ffffff' }} />
-              <span style={{ color: '#ffffff' }}>Select This Folder ({images.length} photos)</span>
+              <span style={{ color: '#ffffff' }}>Select This Folder ({mediaFiles.length} files)</span>
             </button>
           </div>
           {/* Spacer to prevent content from being hidden behind sticky button */}
