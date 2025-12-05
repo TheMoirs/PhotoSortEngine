@@ -63,7 +63,7 @@ export function FilePicker({ onSelectSource }: FilePickerProps) {
   };
 
   return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 relative">
+    <div className="min-h-[50vh] flex flex-col items-center justify-center p-4 sm:p-8 relative">
       {/* Hidden Input for Directory Selection */}
       <input
         type="file"
@@ -76,16 +76,16 @@ export function FilePicker({ onSelectSource }: FilePickerProps) {
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-12 space-y-4"
+        className="text-center mb-6 sm:mb-10 space-y-2 sm:space-y-3"
       >
-        <div className="w-16 h-16 bg-primary/5 rounded-2xl flex items-center justify-center mx-auto mb-6">
-          <FolderOpen className="w-8 h-8 text-primary" />
+        <div className="w-12 h-12 sm:w-14 sm:h-14 bg-primary/5 rounded-xl flex items-center justify-center mx-auto mb-3 sm:mb-4">
+          <FolderOpen className="w-6 h-6 sm:w-7 sm:h-7 text-primary" />
         </div>
-        <h1 className="text-4xl md:text-5xl font-bold text-primary tracking-tight">
-          Import your memories
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary tracking-tight">
+          Sort Your Photos
         </h1>
-        <p className="text-muted-foreground text-lg max-w-md mx-auto">
-          Select a source to begin organizing your photo library. We'll automatically detect dates and metadata.
+        <p className="text-muted-foreground text-sm sm:text-base max-w-sm mx-auto">
+          Choose a source to organize your photos by year
         </p>
       </motion.div>
 
@@ -103,26 +103,26 @@ export function FilePicker({ onSelectSource }: FilePickerProps) {
           variants={container}
           initial="hidden"
           animate="show"
-          className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl"
+          className="grid grid-cols-3 gap-2 sm:gap-4 w-full max-w-md sm:max-w-2xl px-2"
         >
           <SourceCard 
             icon={HardDrive} 
-            label="Local Folder" 
-            desc="Browse your computer"
+            label="Local" 
+            desc="Device"
             onClick={handleLocalClick}
             variants={item}
           />
           <SourceCard 
             icon={Cloud} 
-            label="Google Drive" 
-            desc="Connect cloud storage"
+            label="Google" 
+            desc="Drive"
             onClick={() => handleCloudConnect('gdrive')}
             variants={item}
           />
           <SourceCard 
             icon={CloudLightning} 
             label="OneDrive" 
-            desc="Sync from Microsoft"
+            desc="Microsoft"
             onClick={() => handleCloudConnect('onedrive')}
             variants={item}
           />
@@ -138,19 +138,15 @@ function SourceCard({ icon: Icon, label, desc, onClick, variants }: any) {
     <motion.button
       variants={variants}
       onClick={onClick}
-      whileHover={{ scale: 1.02, y: -4 }}
+      whileHover={{ scale: 1.02, y: -2 }}
       whileTap={{ scale: 0.98 }}
-      className="group relative p-8 rounded-2xl bg-white border border-border shadow-sm hover:shadow-xl hover:border-primary/20 transition-all duration-300 text-left flex flex-col h-full"
+      className="group relative p-3 sm:p-5 rounded-xl bg-white border border-border shadow-sm hover:shadow-lg hover:border-primary/20 transition-all duration-300 text-center flex flex-col items-center h-full"
     >
-      <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center mb-6 group-hover:bg-primary group-hover:text-white transition-colors duration-300">
-        <Icon className="w-6 h-6" />
+      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-secondary flex items-center justify-center mb-2 sm:mb-3 group-hover:bg-primary group-hover:text-white transition-colors duration-300">
+        <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
       </div>
-      <h3 className="text-xl font-semibold mb-2">{label}</h3>
-      <p className="text-sm text-muted-foreground mb-8">{desc}</p>
-      
-      <div className="mt-auto flex items-center text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transform translate-x-[-10px] group-hover:translate-x-0 transition-all duration-300">
-        Select Source <ArrowRight className="w-4 h-4 ml-2" />
-      </div>
+      <h3 className="text-sm sm:text-base font-semibold">{label}</h3>
+      <p className="text-xs text-muted-foreground">{desc}</p>
     </motion.button>
   );
 }
