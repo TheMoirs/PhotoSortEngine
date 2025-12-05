@@ -183,7 +183,13 @@ export default function Home() {
       setSortedFiles([...sortedFiles, ...unsortedFiles]);
       setUnsortedFiles([]);
       setCloudFiles([]);
-      setState('sorted');
+      
+      // Reload folder contents to get updated subfolder list
+      if (source) {
+        await loadCloudFolder(source, currentFolderId);
+      }
+      
+      setState('browsing');
     } catch (error: any) {
       console.error('Error organizing files:', error);
       toast({
@@ -292,6 +298,18 @@ export default function Home() {
                 isSorting={state === 'sorting'}
                 hasSortedFiles={sortedFiles.length > 0}
                 onViewFolders={() => setState('sorted')}
+                onStartOver={handleBackToPicker}
+                subfolders={allCloudFiles
+                  .filter(f => f.mimeType === 'application/vnd.google-apps.folder' || f.mimeType === 'application/vnd.folder')
+                  .filter(f => /^\d{4}$/.test(f.name))
+                  .sort((a, b) => b.name.localeCompare(a.name))
+                  .map(f => ({ id: f.id, name: f.name }))}
+                onNavigateToSubfolder={(folderId, folderName) => {
+                  setFolderPath([...folderPath, { id: folderId, name: folderName }]);
+                  setCurrentFolderId(folderId);
+                  if (source) loadCloudFolder(source, folderId);
+                  setState('folder-browsing');
+                }}
               />
             </motion.div>
           )}

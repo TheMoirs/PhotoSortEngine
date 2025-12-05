@@ -1,8 +1,13 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { FileItem } from "@/lib/mockData";
-import { LayoutGrid, SortAsc, Folder, FolderOpen, Check } from "lucide-react";
+import { LayoutGrid, SortAsc, Folder, FolderOpen, Check, Home, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
+
+interface SubfolderInfo {
+  id: string;
+  name: string;
+}
 
 interface PhotoGridProps {
   files: FileItem[];
@@ -10,9 +15,12 @@ interface PhotoGridProps {
   isSorting: boolean;
   hasSortedFiles: boolean;
   onViewFolders: () => void;
+  onStartOver: () => void;
+  subfolders?: SubfolderInfo[];
+  onNavigateToSubfolder?: (folderId: string, folderName: string) => void;
 }
 
-export function PhotoGrid({ files, onSort, isSorting, hasSortedFiles, onViewFolders }: PhotoGridProps) {
+export function PhotoGrid({ files, onSort, isSorting, hasSortedFiles, onViewFolders, onStartOver, subfolders = [], onNavigateToSubfolder }: PhotoGridProps) {
   return (
     <div className="w-full max-w-7xl mx-auto p-6">
       <div className="flex items-center justify-between mb-8">
@@ -73,22 +81,48 @@ export function PhotoGrid({ files, onSort, isSorting, hasSortedFiles, onViewFold
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center justify-center py-32 text-center border-2 border-dashed border-border rounded-3xl bg-secondary/5"
+          className="flex flex-col items-center py-8 text-center"
         >
-          <div className="w-20 h-20 bg-secondary rounded-full flex items-center justify-center mb-6">
-            <Folder className="w-10 h-10 text-muted-foreground" />
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+            <Check className="w-8 h-8 text-green-600" />
           </div>
-          <h3 className="text-xl font-semibold mb-2">No unsorted photos</h3>
-          <p className="text-muted-foreground max-w-md">
-            All your photos have been moved to their respective year folders.
+          <h3 className="text-xl font-semibold mb-2">All photos sorted!</h3>
+          <p className="text-muted-foreground max-w-md mb-6">
+            Your photos have been moved to their respective year folders.
           </p>
-          {hasSortedFiles && (
-             <button 
-               onClick={onViewFolders}
-               className="mt-6 text-primary font-medium hover:underline"
-             >
-               Go to Organized Library &rarr;
-             </button>
+          
+          <button 
+            onClick={onStartOver}
+            style={{ backgroundColor: '#3b82f6', color: '#ffffff' }}
+            className="flex items-center gap-2 px-6 py-3 rounded-full font-medium shadow-lg mb-8"
+          >
+            <Home className="w-4 h-4" />
+            Start Over
+          </button>
+
+          {subfolders.length > 0 && (
+            <div className="w-full max-w-2xl">
+              <h4 className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider">
+                Year Folders in This Directory
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {subfolders.map((folder) => (
+                  <motion.button
+                    key={folder.id}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => onNavigateToSubfolder?.(folder.id, folder.name)}
+                    className="flex items-center gap-2 p-3 bg-white rounded-xl border border-border hover:border-primary/30 hover:shadow-md transition-all text-left"
+                  >
+                    <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Folder className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <span className="font-medium text-sm truncate">{folder.name}</span>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto flex-shrink-0" />
+                  </motion.button>
+                ))}
+              </div>
+            </div>
           )}
         </motion.div>
       ) : (
