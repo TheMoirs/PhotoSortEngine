@@ -107,22 +107,34 @@ export interface CloudFile {
 export async function listGoogleDrivePhotos(folderId: string = 'root'): Promise<CloudFile[]> {
   const drive = await getGoogleDriveClient();
   
-  const response = await drive.files.list({
-    q: `'${folderId}' in parents and (mimeType contains 'image/' or mimeType = 'application/vnd.google-apps.folder') and trashed = false`,
-    fields: 'files(id, name, mimeType, createdTime, modifiedTime, size, thumbnailLink, webViewLink)',
-    pageSize: 1000,
-  });
+  const allFiles: CloudFile[] = [];
+  let pageToken: string | undefined = undefined;
+  
+  // Paginate through all results
+  do {
+    const response: any = await drive.files.list({
+      q: `'${folderId}' in parents and (mimeType contains 'image/' or mimeType = 'application/vnd.google-apps.folder') and trashed = false`,
+      fields: 'nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, size, thumbnailLink, webViewLink)',
+      pageSize: 1000,
+      pageToken: pageToken,
+    });
 
-  return response.data.files?.map(file => ({
-    id: file.id!,
-    name: file.name!,
-    mimeType: file.mimeType!,
-    createdTime: file.createdTime || undefined,
-    modifiedTime: file.modifiedTime || undefined,
-    size: file.size ? parseInt(file.size) : undefined,
-    thumbnailLink: file.thumbnailLink || undefined,
-    webViewLink: file.webViewLink || undefined,
-  })) || [];
+    const files = response.data.files?.map((file: any) => ({
+      id: file.id!,
+      name: file.name!,
+      mimeType: file.mimeType!,
+      createdTime: file.createdTime || undefined,
+      modifiedTime: file.modifiedTime || undefined,
+      size: file.size ? parseInt(file.size) : undefined,
+      thumbnailLink: file.thumbnailLink || undefined,
+      webViewLink: file.webViewLink || undefined,
+    })) || [];
+    
+    allFiles.push(...files);
+    pageToken = response.data.nextPageToken;
+  } while (pageToken);
+
+  return allFiles;
 }
 
 export async function moveGoogleDriveFile(fileId: string, targetFolderId: string): Promise<{ moved: boolean; skipped: boolean; reason?: string }> {
@@ -188,32 +200,38 @@ export async function listOneDrivePhotos(folderId: string = 'root'): Promise<Clo
   const client = await getOneDriveClient();
   
   const path = folderId === 'root' ? '/me/drive/root/children' : `/me/drive/items/${folderId}/children`;
-  const response = await client.api(path).get();
+  
+  const allItems: any[] = [];
+  let nextLink: string | null = path;
+  
+  // Paginate through all results
+  while (nextLink) {
+    const response = await client.api(nextLink).get();
+    allItems.push(...(response.value || []));
+    nextLink = response['@odata.nextLink'] || null;
+  }
 
   const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.heic', '.heif', '.tiff', '.tif'];
   
   const isImage = (item: any): boolean => {
-    // Check mimeType first
     if (item.file?.mimeType?.startsWith('image/')) return true;
-    // Fall back to extension check
     const name = item.name?.toLowerCase() || '';
     return imageExtensions.some(ext => name.endsWith(ext));
   };
 
-  return response.value
+  return allItems
     .filter((item: any) => isImage(item) || item.folder)
     .map((item: any) => {
       const name = item.name?.toLowerCase() || '';
       let mimeType = item.file?.mimeType;
       
-      // Infer mimeType from extension if not provided
       if (!mimeType && !item.folder) {
         if (name.endsWith('.jpg') || name.endsWith('.jpeg')) mimeType = 'image/jpeg';
         else if (name.endsWith('.png')) mimeType = 'image/png';
         else if (name.endsWith('.gif')) mimeType = 'image/gif';
         else if (name.endsWith('.webp')) mimeType = 'image/webp';
         else if (name.endsWith('.heic') || name.endsWith('.heif')) mimeType = 'image/heic';
-        else mimeType = 'image/jpeg'; // default for images
+        else mimeType = 'image/jpeg';
       }
       
       return {
