@@ -146,23 +146,23 @@ export function FolderBrowser({
             </div>
           )}
 
-          {/* Images Preview */}
-          {images.length > 0 && (
+          {/* Media Preview */}
+          {mediaFiles.length > 0 && (
             <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider">Photos in this folder</h3>
+              <h3 className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider">Media in this folder</h3>
               <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {images.slice(0, 12).map((image) => {
+                {mediaFiles.slice(0, 12).map((file) => {
                   const thumbnailUrl = source === 'gdrive' 
-                    ? `/api/gdrive/thumbnail/${image.id}` 
-                    : `/api/onedrive/thumbnail/${image.id}`;
+                    ? `/api/gdrive/thumbnail/${file.id}` 
+                    : `/api/onedrive/thumbnail/${file.id}`;
                   return (
                     <div
-                      key={image.id}
+                      key={file.id}
                       className="aspect-square rounded-lg overflow-hidden bg-secondary"
                     >
                       <img 
                         src={thumbnailUrl} 
-                        alt={image.name}
+                        alt={file.name}
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display = 'none';
@@ -171,16 +171,16 @@ export function FolderBrowser({
                     </div>
                   );
                 })}
-                {images.length > 12 && (
+                {mediaFiles.length > 12 && (
                   <div className="aspect-square rounded-lg bg-secondary flex items-center justify-center">
-                    <span className="text-muted-foreground font-medium">+{images.length - 12} more</span>
+                    <span className="text-muted-foreground font-medium">+{mediaFiles.length - 12} more</span>
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {folders.length === 0 && images.length === 0 && (
+          {folders.length === 0 && mediaFiles.length === 0 && (
             <div className="text-center py-20">
               <Folder className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-2">Empty Folder</h3>
