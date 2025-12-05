@@ -121,13 +121,17 @@ export default function Home() {
 
   const handleSelectCloudFolder = () => {
     const isImageFile = (f: CloudFile): boolean => {
-      if (f.mimeType?.startsWith('image/')) return true;
-      const name = f.name?.toLowerCase() || '';
+      const mimeType = f.mimeType || '';
+      if (mimeType.startsWith('image/')) return true;
+      const name = (f.name || '').toLowerCase();
       const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.bmp', '.tiff', '.svg'];
       return imageExtensions.some(ext => name.endsWith(ext));
     };
     const isFolderFile = (f: CloudFile): boolean => {
-      return f.mimeType === 'application/vnd.google-apps.folder' || f.mimeType === 'application/vnd.folder';
+      const mimeType = f.mimeType || '';
+      return mimeType === 'application/vnd.google-apps.folder' || 
+             mimeType === 'application/vnd.folder' ||
+             mimeType.includes('folder');
     };
     const imageFiles = allCloudFiles.filter(f => !isFolderFile(f) && isImageFile(f));
     setCloudFiles(imageFiles);
