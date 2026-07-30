@@ -55,8 +55,8 @@ export async function organizeGoogleDrivePhotos(files: CloudFile[], parentFolder
   });
   
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to organize Google Drive photos');
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || `Server error ${response.status}: Failed to organize Google Drive photos`);
   }
   
   return response.json();
@@ -79,8 +79,8 @@ export async function organizeOneDrivePhotos(files: CloudFile[], parentFolderId:
   });
   
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to organize OneDrive photos');
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || `Server error ${response.status}: Failed to organize OneDrive photos`);
   }
   
   return response.json();

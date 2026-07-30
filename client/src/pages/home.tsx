@@ -223,6 +223,20 @@ export default function Home() {
     }
   };
 
+  const handleBackToBrowsing = () => {
+    // Go back from photo grid to folder browser, reloading current folder
+    setState('folder-browsing');
+    if (source) {
+      loadCloudFolder(source, currentFolderId);
+    }
+  };
+
+  const handleCancelSort = () => {
+    // Stop the sorting UI immediately; the server may still be running but the user
+    // can navigate away. State goes back to browsing with whatever files remain.
+    setState('browsing');
+  };
+
   const handleBackToRoot = () => {
     setState('browsing');
   };
@@ -330,11 +344,13 @@ export default function Home() {
             >
               <PhotoGrid 
                 files={unsortedFiles} 
-                onSort={handleSort} 
+                onSort={handleSort}
+                onCancelSort={handleCancelSort}
                 isSorting={state === 'sorting'}
                 hasSortedFiles={sortedFiles.length > 0}
                 onViewFolders={() => setState('sorted')}
                 onStartOver={handleBackToPicker}
+                onBack={(source === 'gdrive' || source === 'onedrive') ? handleBackToBrowsing : undefined}
                 subfolders={allCloudFiles
                   .filter(f => f.mimeType === 'application/vnd.google-apps.folder' || f.mimeType === 'application/vnd.folder')
                   .filter(f => /^\d{4}$/.test(f.name))

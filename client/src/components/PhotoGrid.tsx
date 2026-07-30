@@ -1,7 +1,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { FileItem } from "@/lib/mockData";
-import { LayoutGrid, SortAsc, Folder, FolderOpen, Check, Home, ChevronRight, Play } from "lucide-react";
+import { LayoutGrid, SortAsc, Folder, FolderOpen, Check, Home, ChevronRight, Play, ArrowLeft, X, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface SubfolderInfo {
@@ -12,19 +12,30 @@ interface SubfolderInfo {
 interface PhotoGridProps {
   files: FileItem[];
   onSort: () => void;
+  onCancelSort?: () => void;
   isSorting: boolean;
   hasSortedFiles: boolean;
   onViewFolders: () => void;
   onStartOver: () => void;
+  onBack?: () => void;
   subfolders?: SubfolderInfo[];
   onNavigateToSubfolder?: (folderId: string, folderName: string) => void;
 }
 
-export function PhotoGrid({ files, onSort, isSorting, hasSortedFiles, onViewFolders, onStartOver, subfolders = [], onNavigateToSubfolder }: PhotoGridProps) {
+export function PhotoGrid({ files, onSort, onCancelSort, isSorting, hasSortedFiles, onViewFolders, onStartOver, onBack, subfolders = [], onNavigateToSubfolder }: PhotoGridProps) {
   return (
     <div className="w-full max-w-7xl mx-auto p-6">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="p-2 rounded-lg hover:bg-secondary transition-colors"
+              title="Back to folder browser"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+          )}
           <div className="p-2 bg-white rounded-lg border border-border shadow-sm">
             <LayoutGrid className="w-5 h-5 text-primary" />
           </div>
@@ -37,7 +48,7 @@ export function PhotoGrid({ files, onSort, isSorting, hasSortedFiles, onViewFold
         </div>
 
         <div className="flex gap-3">
-          {hasSortedFiles && (
+          {hasSortedFiles && !isSorting && (
             <motion.button
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -48,20 +59,37 @@ export function PhotoGrid({ files, onSort, isSorting, hasSortedFiles, onViewFold
               View Folders
             </motion.button>
           )}
+
+          {isSorting && onCancelSort && (
+            <motion.button
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              onClick={onCancelSort}
+              className="flex items-center gap-2 px-6 py-3 bg-secondary text-destructive rounded-full font-medium hover:bg-secondary/80 transition-colors"
+            >
+              <X className="w-4 h-4" />
+              Cancel
+            </motion.button>
+          )}
           
           <motion.button
-            whileHover={{ scale: files.length > 0 ? 1.05 : 1 }}
-            whileTap={{ scale: files.length > 0 ? 0.95 : 1 }}
+            whileHover={{ scale: files.length > 0 && !isSorting ? 1.05 : 1 }}
+            whileTap={{ scale: files.length > 0 && !isSorting ? 0.95 : 1 }}
             onClick={onSort}
             disabled={isSorting || files.length === 0}
-            style={files.length === 0 
+            style={isSorting
+              ? { backgroundColor: '#e5e7eb', color: '#6b7280' }
+              : files.length === 0
               ? { backgroundColor: '#e5e7eb', color: '#6b7280' }
               : { backgroundColor: '#3b82f6', color: '#ffffff' }
             }
             className="flex items-center gap-2 px-6 py-3 rounded-full font-medium shadow-lg transition-all"
           >
             {isSorting ? (
-              "Organizing..."
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Organising…
+              </>
             ) : files.length === 0 ? (
               <>
                 <Check className="w-4 h-4" />
