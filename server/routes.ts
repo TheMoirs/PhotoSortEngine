@@ -9,6 +9,7 @@ import {
   listOneDrivePhotos,
   moveOneDriveFile,
   createOneDriveFolder,
+  oneDriveProxy,
   type CloudFile
 } from "./cloud-storage";
 
@@ -219,29 +220,23 @@ export async function registerRoutes(
     }
   });
 
-  // Proxy OneDrive thumbnails - use actual thumbnails API for speed
+  // Proxy OneDrive thumbnails
   app.get("/api/onedrive/thumbnail/:fileId", async (req, res) => {
     try {
-      const { fileId } = req.params;
-      
-      const { ReplitConnectors } = await import("@replit/connectors-sdk");
-      const connectors = new ReplitConnectors();
-      
-      // Get thumbnail URL from OneDrive
-      const response = await connectors.proxy("onedrive", `/me/drive/items/${fileId}/thumbnails`, { method: "GET" });
-      const thumbnails = await response.json();
-      
-      if (thumbnails.value && thumbnails.value.length > 0) {
-        const thumb = thumbnails.value[0];
-        const thumbnailUrl = thumb.large?.url || thumb.medium?.url || thumb.small?.url;
-        
-        if (thumbnailUrl) {
-          // Redirect to the thumbnail URL
-          return res.redirect(thumbnailUrl);
-        }
+      const fileId = decodeURIComponent(req.params.fileId);
+
+      // Fetch the item with thumbnails expanded in one request
+      const data = await oneDriveProxy(`/me/drive/items/${encodeURIComponent(fileId)}?expand=thumbnails`);
+
+      const thumbSet = data?.thumbnails?.[0];
+      const thumbnailUrl = thumbSet?.large?.url || thumbSet?.medium?.url || thumbSet?.small?.url;
+
+      if (thumbnailUrl) {
+        // Thumbnail URLs from Graph are public CDN links — redirect directly
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        return res.redirect(thumbnailUrl);
       }
-      
-      // Fallback: return a placeholder response
+
       res.status(404).json({ error: 'No thumbnail available' });
     } catch (error: any) {
       console.error('Error fetching OneDrive thumbnail:', error);

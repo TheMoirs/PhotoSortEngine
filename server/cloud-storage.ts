@@ -28,7 +28,7 @@ export async function getGoogleDriveProxyResponse(path: string): Promise<Respons
   return connectors.proxy('google-drive', path, { method: 'GET' });
 }
 
-async function oneDriveProxy(path: string, options?: { method?: string; body?: any }): Promise<any> {
+export async function oneDriveProxy(path: string, options?: { method?: string; body?: any }): Promise<any> {
   const connectors = new ReplitConnectors();
   const method = options?.method || 'GET';
   const fetchOptions: any = { method };
