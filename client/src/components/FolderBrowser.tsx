@@ -39,7 +39,13 @@ export function FolderBrowser({
   source
 }: FolderBrowserProps) {
   const folders = files.filter(isFolderFile);
-  const mediaFiles = files.filter(f => !isFolderFile(f) && isMediaFile(f));
+  const mediaFiles = files
+    .filter(f => !isFolderFile(f) && isMediaFile(f))
+    .sort((a, b) => {
+      const dateA = new Date(a.modifiedTime || a.createdTime || 0).getTime();
+      const dateB = new Date(b.modifiedTime || b.createdTime || 0).getTime();
+      return dateB - dateA; // newest first
+    });
 
   return (
     <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 pb-24 sm:pb-6">
