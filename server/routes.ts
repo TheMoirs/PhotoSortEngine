@@ -202,11 +202,12 @@ export async function registerRoutes(
     try {
       const { fileId } = req.params;
       
-      const { getOneDriveClient } = await import("./cloud-storage");
-      const client = await getOneDriveClient();
+      const { ReplitConnectors } = await import("@replit/connectors-sdk");
+      const connectors = new ReplitConnectors();
       
       // Get thumbnail URL from OneDrive
-      const thumbnails = await client.api(`/me/drive/items/${fileId}/thumbnails`).get();
+      const response = await connectors.proxy("onedrive", `/me/drive/items/${fileId}/thumbnails`, { method: "GET" });
+      const thumbnails = await response.json();
       
       if (thumbnails.value && thumbnails.value.length > 0) {
         const thumb = thumbnails.value[0];

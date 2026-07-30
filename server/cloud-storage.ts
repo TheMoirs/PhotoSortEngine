@@ -1,8 +1,7 @@
 import { google } from 'googleapis';
-import { Client } from '@microsoft/microsoft-graph-client';
+import { ReplitConnectors } from '@replit/connectors-sdk';
 
 let googleConnectionSettings: any;
-let onedriveConnectionSettings: any;
 
 async function getGoogleAccessToken() {
   if (googleConnectionSettings && googleConnectionSettings.settings.expires_at && new Date(googleConnectionSettings.settings.expires_at).getTime() > Date.now()) {
@@ -38,40 +37,6 @@ async function getGoogleAccessToken() {
   return accessToken;
 }
 
-async function getOneDriveAccessToken() {
-  if (onedriveConnectionSettings && onedriveConnectionSettings.settings.expires_at && new Date(onedriveConnectionSettings.settings.expires_at).getTime() > Date.now()) {
-    return onedriveConnectionSettings.settings.access_token;
-  }
-  
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
-
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
-  }
-
-  onedriveConnectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=onedrive',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
-    }
-  ).then(res => res.json()).then(data => data.items?.[0]);
-
-  const accessToken = onedriveConnectionSettings?.settings?.access_token || onedriveConnectionSettings.settings?.oauth?.credentials?.access_token;
-
-  if (!onedriveConnectionSettings || !accessToken) {
-    throw new Error('OneDrive not connected');
-  }
-  return accessToken;
-}
-
 export async function getGoogleDriveClient() {
   const accessToken = await getGoogleAccessToken();
 
@@ -83,14 +48,21 @@ export async function getGoogleDriveClient() {
   return google.drive({ version: 'v3', auth: oauth2Client });
 }
 
-export async function getOneDriveClient() {
-  const accessToken = await getOneDriveAccessToken();
-
-  return Client.initWithMiddleware({
-    authProvider: {
-      getAccessToken: async () => accessToken
-    }
-  });
+async function oneDriveProxy(path: string, options?: { method?: string; body?: any }): Promise<any> {
+  const connectors = new ReplitConnectors();
+  const method = options?.method || 'GET';
+  const fetchOptions: any = { method };
+  if (options?.body !== undefined) {
+    fetchOptions.body = JSON.stringify(options.body);
+    fetchOptions.headers = { 'Content-Type': 'application/json' };
+  }
+  const response = await connectors.proxy('onedrive', path, fetchOptions);
+  if (!response.ok && response.status !== 404) {
+    const text = await response.text();
+    throw Object.assign(new Error(`OneDrive API error ${response.status}: ${text}`), { statusCode: response.status });
+  }
+  if (response.status === 204 || response.headers.get('content-length') === '0') return null;
+  return response.json();
 }
 
 export interface CloudFile {
@@ -197,18 +169,23 @@ export async function createGoogleDriveFolder(folderName: string, parentId: stri
 }
 
 export async function listOneDrivePhotos(folderId: string = 'root'): Promise<CloudFile[]> {
-  const client = await getOneDriveClient();
-  
-  const path = folderId === 'root' ? '/me/drive/root/children' : `/me/drive/items/${folderId}/children`;
+  const apiPath = folderId === 'root' ? '/me/drive/root/children' : `/me/drive/items/${folderId}/children`;
   
   const allItems: any[] = [];
-  let nextLink: string | null = path;
+  let nextPath: string | null = apiPath;
   
   // Paginate through all results
-  while (nextLink) {
-    const response = await client.api(nextLink).get();
+  while (nextPath) {
+    const response = await oneDriveProxy(nextPath);
     allItems.push(...(response.value || []));
-    nextLink = response['@odata.nextLink'] || null;
+    // nextLink from Graph API is a full URL; extract the path+query portion
+    const nextLink: string | undefined = response['@odata.nextLink'];
+    if (nextLink) {
+      const url = new URL(nextLink);
+      nextPath = url.pathname + url.search;
+    } else {
+      nextPath = null;
+    }
   }
 
   const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.heic', '.heif', '.tiff', '.tif'];
@@ -256,42 +233,34 @@ export async function listOneDrivePhotos(folderId: string = 'root'): Promise<Clo
 }
 
 export async function moveOneDriveFile(fileId: string, targetFolderId: string): Promise<{ moved: boolean; skipped: boolean; reason?: string }> {
-  const client = await getOneDriveClient();
-  
   try {
     // First check if file is already in the target folder
-    const file = await client.api(`/me/drive/items/${fileId}`).get();
+    const file = await oneDriveProxy(`/me/drive/items/${fileId}`);
     if (file.parentReference?.id === targetFolderId) {
       return { moved: false, skipped: true, reason: 'File already in target folder' };
     }
     
     // Try to move the file with replace behavior for conflicts
-    await client.api(`/me/drive/items/${fileId}`).patch({
-      parentReference: {
-        id: targetFolderId
-      },
-      '@microsoft.graph.conflictBehavior': 'replace'
+    await oneDriveProxy(`/me/drive/items/${fileId}`, {
+      method: 'PATCH',
+      body: {
+        parentReference: { id: targetFolderId },
+        '@microsoft.graph.conflictBehavior': 'replace'
+      }
     });
     return { moved: true, skipped: false };
   } catch (error: any) {
-    // If conflict still happens, try deleting existing and moving again
-    if (error.code === 'nameAlreadyExists' || error.statusCode === 409) {
+    if (error.statusCode === 409) {
       try {
-        // Get the file name
-        const file = await client.api(`/me/drive/items/${fileId}`).get();
+        const file = await oneDriveProxy(`/me/drive/items/${fileId}`);
         const fileName = file.name;
-        
-        // Find and delete the existing file in target folder
-        const existingFile = await client.api(`/me/drive/items/${targetFolderId}:/${fileName}`).get();
+        const existingFile = await oneDriveProxy(`/me/drive/items/${targetFolderId}:/${fileName}`);
         if (existingFile && existingFile.id) {
-          await client.api(`/me/drive/items/${existingFile.id}`).delete();
+          await oneDriveProxy(`/me/drive/items/${existingFile.id}`, { method: 'DELETE' });
         }
-        
-        // Now move the file
-        await client.api(`/me/drive/items/${fileId}`).patch({
-          parentReference: {
-            id: targetFolderId
-          }
+        await oneDriveProxy(`/me/drive/items/${fileId}`, {
+          method: 'PATCH',
+          body: { parentReference: { id: targetFolderId } }
         });
         return { moved: true, skipped: false };
       } catch (retryError) {
@@ -304,47 +273,37 @@ export async function moveOneDriveFile(fileId: string, targetFolderId: string): 
 }
 
 export async function createOneDriveFolder(folderName: string, parentId: string = 'root'): Promise<string> {
-  const client = await getOneDriveClient();
-  
-  // First, try to get the folder by path (most reliable method)
+  // First, try to get the folder by path
   try {
-    const pathQuery = parentId === 'root' 
-      ? `/me/drive/root:/${folderName}` 
+    const pathQuery = parentId === 'root'
+      ? `/me/drive/root:/${folderName}`
       : `/me/drive/items/${parentId}:/${folderName}`;
-    
-    const existing = await client.api(pathQuery).get();
+    const existing = await oneDriveProxy(pathQuery);
     if (existing && existing.id && existing.folder) {
       return existing.id;
     }
   } catch (pathError: any) {
-    // Item doesn't exist by path, continue to create
     if (pathError.statusCode !== 404) {
       console.log('Path lookup error:', pathError.message);
     }
   }
   
-  // Try to create the folder
   const createPath = parentId === 'root' ? '/me/drive/root/children' : `/me/drive/items/${parentId}/children`;
   
   try {
-    const response = await client.api(createPath).post({
-      name: folderName,
-      folder: {},
-      '@microsoft.graph.conflictBehavior': 'fail'
+    const response = await oneDriveProxy(createPath, {
+      method: 'POST',
+      body: { name: folderName, folder: {}, '@microsoft.graph.conflictBehavior': 'fail' }
     });
     return response.id;
   } catch (createError: any) {
-    // If creation fails because name exists, try path lookup again
-    if (createError.code === 'nameAlreadyExists' || createError.statusCode === 409) {
+    if (createError.statusCode === 409) {
       try {
-        const pathQuery = parentId === 'root' 
-          ? `/me/drive/root:/${folderName}` 
+        const pathQuery = parentId === 'root'
+          ? `/me/drive/root:/${folderName}`
           : `/me/drive/items/${parentId}:/${folderName}`;
-        
-        const existing = await client.api(pathQuery).get();
-        if (existing && existing.id) {
-          return existing.id;
-        }
+        const existing = await oneDriveProxy(pathQuery);
+        if (existing && existing.id) return existing.id;
       } catch (retryError) {
         console.log('Retry path lookup failed:', retryError);
       }
