@@ -1,51 +1,31 @@
-import { google } from 'googleapis';
 import { ReplitConnectors } from '@replit/connectors-sdk';
 
-let googleConnectionSettings: any;
-
-async function getGoogleAccessToken() {
-  if (googleConnectionSettings && googleConnectionSettings.settings.expires_at && new Date(googleConnectionSettings.settings.expires_at).getTime() > Date.now()) {
-    return googleConnectionSettings.settings.access_token;
+async function googleDriveProxy(path: string, options?: { method?: string; body?: any; params?: Record<string, string> }): Promise<any> {
+  const connectors = new ReplitConnectors();
+  const method = options?.method || 'GET';
+  const fetchOptions: any = { method };
+  if (options?.body !== undefined) {
+    fetchOptions.body = JSON.stringify(options.body);
+    fetchOptions.headers = { 'Content-Type': 'application/json' };
   }
-  
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
-
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+  // Append query params if provided
+  let fullPath = path;
+  if (options?.params) {
+    const qs = new URLSearchParams(options.params).toString();
+    fullPath = `${path}?${qs}`;
   }
-
-  googleConnectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=google-drive',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
-    }
-  ).then(res => res.json()).then(data => data.items?.[0]);
-
-  const accessToken = googleConnectionSettings?.settings?.access_token || googleConnectionSettings.settings?.oauth?.credentials?.access_token;
-
-  if (!googleConnectionSettings || !accessToken) {
-    throw new Error('Google Drive not connected');
+  const response = await connectors.proxy('google-drive', fullPath, fetchOptions);
+  if (!response.ok) {
+    const text = await response.text();
+    throw Object.assign(new Error(`Google Drive API error ${response.status}: ${text}`), { statusCode: response.status, code: response.status });
   }
-  return accessToken;
+  if (response.status === 204 || response.headers.get('content-length') === '0') return null;
+  return response.json();
 }
 
-export async function getGoogleDriveClient() {
-  const accessToken = await getGoogleAccessToken();
-
-  const oauth2Client = new google.auth.OAuth2();
-  oauth2Client.setCredentials({
-    access_token: accessToken
-  });
-
-  return google.drive({ version: 'v3', auth: oauth2Client });
+export async function getGoogleDriveProxyResponse(path: string): Promise<Response> {
+  const connectors = new ReplitConnectors();
+  return connectors.proxy('google-drive', path, { method: 'GET' });
 }
 
 async function oneDriveProxy(path: string, options?: { method?: string; body?: any }): Promise<any> {
@@ -79,65 +59,54 @@ export interface CloudFile {
 }
 
 export async function listGoogleDrivePhotos(folderId: string = 'root'): Promise<CloudFile[]> {
-  const drive = await getGoogleDriveClient();
-  
   const allFiles: CloudFile[] = [];
   let pageToken: string | undefined = undefined;
-  
-  // Paginate through all results - include both images and videos
+
   do {
-    const response: any = await drive.files.list({
+    const params: Record<string, string> = {
       q: `'${folderId}' in parents and (mimeType contains 'image/' or mimeType contains 'video/' or mimeType = 'application/vnd.google-apps.folder') and trashed = false`,
       fields: 'nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, size, thumbnailLink, webViewLink)',
-      pageSize: 1000,
-      pageToken: pageToken,
-    });
+      pageSize: '1000',
+    };
+    if (pageToken) params.pageToken = pageToken;
 
-    const files = response.data.files?.map((file: any) => ({
-      id: file.id!,
-      name: file.name!,
-      mimeType: file.mimeType!,
+    const data = await googleDriveProxy('/drive/v3/files', { params });
+
+    const files = (data.files || []).map((file: any) => ({
+      id: file.id,
+      name: file.name,
+      mimeType: file.mimeType,
       createdTime: file.createdTime || undefined,
       modifiedTime: file.modifiedTime || undefined,
       size: file.size ? parseInt(file.size) : undefined,
       thumbnailLink: file.thumbnailLink || undefined,
       webViewLink: file.webViewLink || undefined,
-    })) || [];
-    
+    }));
+
     allFiles.push(...files);
-    pageToken = response.data.nextPageToken;
+    pageToken = data.nextPageToken;
   } while (pageToken);
 
   return allFiles;
 }
 
 export async function moveGoogleDriveFile(fileId: string, targetFolderId: string): Promise<{ moved: boolean; skipped: boolean; reason?: string }> {
-  const drive = await getGoogleDriveClient();
-  
   try {
-    const file = await drive.files.get({
-      fileId: fileId,
-      fields: 'parents'
-    });
+    const file = await googleDriveProxy(`/drive/v3/files/${fileId}`, { params: { fields: 'parents' } });
 
-    // Check if already in target folder
-    if (file.data.parents?.includes(targetFolderId)) {
+    if (file.parents?.includes(targetFolderId)) {
       return { moved: false, skipped: true, reason: 'File already in target folder' };
     }
 
-    const previousParents = file.data.parents?.join(',');
-
-    await drive.files.update({
-      fileId: fileId,
-      addParents: targetFolderId,
-      removeParents: previousParents,
-      fields: 'id, parents'
+    const previousParents = (file.parents || []).join(',');
+    await googleDriveProxy(`/drive/v3/files/${fileId}`, {
+      method: 'PATCH',
+      params: { addParents: targetFolderId, removeParents: previousParents, fields: 'id,parents' },
     });
-    
+
     return { moved: true, skipped: false };
   } catch (error: any) {
-    // Handle duplicate name errors
-    if (error.code === 409 || error.message?.includes('already exists')) {
+    if (error.statusCode === 409 || error.message?.includes('already exists')) {
       return { moved: false, skipped: true, reason: 'File with same name already exists in target folder' };
     }
     throw error;
@@ -145,29 +114,25 @@ export async function moveGoogleDriveFile(fileId: string, targetFolderId: string
 }
 
 export async function createGoogleDriveFolder(folderName: string, parentId: string = 'root'): Promise<string> {
-  const drive = await getGoogleDriveClient();
-  
-  // First, check if folder already exists
-  const existingFolders = await drive.files.list({
-    q: `'${parentId}' in parents and name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
-    fields: 'files(id, name)',
-  });
-  
-  if (existingFolders.data.files && existingFolders.data.files.length > 0) {
-    return existingFolders.data.files[0].id!;
-  }
-  
-  // Create new folder if it doesn't exist
-  const response = await drive.files.create({
-    requestBody: {
-      name: folderName,
-      mimeType: 'application/vnd.google-apps.folder',
-      parents: [parentId]
+  // Check if folder already exists
+  const existing = await googleDriveProxy('/drive/v3/files', {
+    params: {
+      q: `'${parentId}' in parents and name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+      fields: 'files(id,name)',
     },
-    fields: 'id'
   });
 
-  return response.data.id!;
+  if (existing.files && existing.files.length > 0) {
+    return existing.files[0].id;
+  }
+
+  const created = await googleDriveProxy('/drive/v3/files', {
+    method: 'POST',
+    params: { fields: 'id' },
+    body: { name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] },
+  });
+
+  return created.id;
 }
 
 export async function listOneDrivePhotos(folderId: string = 'root'): Promise<CloudFile[]> {

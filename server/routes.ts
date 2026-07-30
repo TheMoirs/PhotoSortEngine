@@ -5,6 +5,7 @@ import {
   listGoogleDrivePhotos, 
   moveGoogleDriveFile, 
   createGoogleDriveFolder,
+  getGoogleDriveProxyResponse,
   listOneDrivePhotos,
   moveOneDriveFile,
   createOneDriveFolder,
@@ -178,19 +179,24 @@ export async function registerRoutes(
   app.get("/api/gdrive/thumbnail/:fileId", async (req, res) => {
     try {
       const { fileId } = req.params;
-      const size = req.query.size || 's220';
-      
-      const { getGoogleDriveClient } = await import("./cloud-storage");
-      const drive = await getGoogleDriveClient();
-      
-      const response = await drive.files.get({
-        fileId: fileId,
-        alt: 'media'
-      }, { responseType: 'stream' });
 
-      res.setHeader('Content-Type', response.headers['content-type'] || 'image/jpeg');
+      const response = await getGoogleDriveProxyResponse(`/drive/v3/files/${fileId}?alt=media`);
+
+      if (!response.ok) {
+        return res.status(response.status).json({ error: 'Failed to fetch file' });
+      }
+
+      res.setHeader('Content-Type', response.headers.get('content-type') || 'image/jpeg');
       res.setHeader('Cache-Control', 'public, max-age=3600');
-      (response.data as any).pipe(res);
+      const reader = response.body?.getReader();
+      if (!reader) return res.status(500).json({ error: 'No response body' });
+      const pump = async () => {
+        const { done, value } = await reader.read();
+        if (done) { res.end(); return; }
+        res.write(value);
+        await pump();
+      };
+      await pump();
     } catch (error: any) {
       console.error('Error fetching thumbnail:', error);
       res.status(500).json({ error: 'Failed to fetch thumbnail' });
