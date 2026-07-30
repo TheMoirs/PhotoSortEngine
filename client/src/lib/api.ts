@@ -1,3 +1,10 @@
+export class AuthError extends Error {
+  constructor(public provider: string) {
+    super(`${provider} connection expired`);
+    this.name = 'AuthError';
+  }
+}
+
 export interface CloudFile {
   id: string;
   name: string;
@@ -12,7 +19,9 @@ export interface CloudFile {
 export async function fetchGoogleDrivePhotos(folderId: string = 'root'): Promise<CloudFile[]> {
   const response = await fetch(`/api/gdrive/photos?folderId=${folderId}`);
   if (!response.ok) {
-    throw new Error('Failed to fetch Google Drive photos');
+    const data = await response.json().catch(() => ({}));
+    if (data.authError || response.status === 401) throw new AuthError('gdrive');
+    throw new Error(data.error || 'Failed to fetch Google Drive photos');
   }
   const data = await response.json();
   return data.files;
@@ -21,7 +30,9 @@ export async function fetchGoogleDrivePhotos(folderId: string = 'root'): Promise
 export async function fetchOneDrivePhotos(folderId: string = 'root'): Promise<CloudFile[]> {
   const response = await fetch(`/api/onedrive/photos?folderId=${folderId}`);
   if (!response.ok) {
-    throw new Error('Failed to fetch OneDrive photos');
+    const data = await response.json().catch(() => ({}));
+    if (data.authError || response.status === 401) throw new AuthError('onedrive');
+    throw new Error(data.error || 'Failed to fetch OneDrive photos');
   }
   const data = await response.json();
   return data.files;

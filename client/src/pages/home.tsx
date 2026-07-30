@@ -3,6 +3,7 @@ import { FilePicker } from "@/components/FilePicker";
 import { PhotoGrid } from "@/components/PhotoGrid";
 import { FolderView } from "@/components/FolderView";
 import { FolderBrowser } from "@/components/FolderBrowser";
+import { ReconnectScreen } from "@/components/ReconnectScreen";
 import { FileItem } from "@/lib/mockData";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
@@ -11,11 +12,12 @@ import {
   fetchOneDrivePhotos, 
   organizeGoogleDrivePhotos,
   organizeOneDrivePhotos,
+  AuthError,
   type CloudFile 
 } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
-type AppState = 'picking' | 'loading' | 'folder-browsing' | 'browsing' | 'sorting' | 'sorted';
+type AppState = 'picking' | 'loading' | 'folder-browsing' | 'browsing' | 'sorting' | 'sorted' | 'auth-error';
 
 function formatBytes(bytes: number, decimals = 1) {
   if (bytes === 0) return '0 B';
@@ -54,13 +56,17 @@ export default function Home() {
       setAllCloudFiles(files);
       setIsBrowsingLoading(false);
     } catch (error: any) {
+      setIsBrowsingLoading(false);
+      if (error instanceof AuthError) {
+        setState('auth-error');
+        return;
+      }
       console.error('Error loading folder:', error);
       toast({
         title: "Error loading folder",
         description: error.message || "Failed to load folder contents",
         variant: "destructive",
       });
-      setIsBrowsingLoading(false);
     }
   };
 
@@ -80,9 +86,14 @@ export default function Home() {
         setCurrentFolderId('root');
         setFolderPath([]);
         await loadCloudFolder(src, 'root');
-        setState('folder-browsing');
+        // loadCloudFolder will set state to 'auth-error' if needed
+        setState(prev => prev === 'auth-error' ? 'auth-error' : 'folder-browsing');
       }
     } catch (error: any) {
+      if (error instanceof AuthError) {
+        setState('auth-error');
+        return;
+      }
       console.error('Error loading files:', error);
       toast({
         title: "Error loading files",
@@ -274,6 +285,20 @@ export default function Home() {
             >
               <Loader2 className="w-12 h-12 text-primary animate-spin" />
               <p className="text-muted-foreground font-medium">Connecting to cloud storage...</p>
+            </motion.div>
+          )}
+
+          {state === 'auth-error' && source && (
+            <motion.div
+              key="auth-error"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+            >
+              <ReconnectScreen
+                provider={source as 'gdrive' | 'onedrive'}
+                onBack={handleBackToPicker}
+              />
             </motion.div>
           )}
 

@@ -17,6 +17,16 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
+  function isAuthError(error: any): boolean {
+    const msg = error?.message || '';
+    return msg.includes('invalid_grant') || 
+           msg.includes('re-authorization') ||
+           msg.includes('disconnected') ||
+           msg.includes('not connected') ||
+           error?.statusCode === 401 ||
+           error?.statusCode === 403;
+  }
+
   // List photos from Google Drive
   app.get("/api/gdrive/photos", async (req, res) => {
     try {
@@ -25,7 +35,10 @@ export async function registerRoutes(
       res.json({ files });
     } catch (error: any) {
       console.error('Error listing Google Drive photos:', error);
-      res.status(500).json({ error: error.message || 'Failed to list photos' });
+      res.status(isAuthError(error) ? 401 : 500).json({ 
+        error: error.message || 'Failed to list photos',
+        authError: isAuthError(error)
+      });
     }
   });
 
@@ -37,7 +50,10 @@ export async function registerRoutes(
       res.json({ files });
     } catch (error: any) {
       console.error('Error listing OneDrive photos:', error);
-      res.status(500).json({ error: error.message || 'Failed to list photos' });
+      res.status(isAuthError(error) ? 401 : 500).json({ 
+        error: error.message || 'Failed to list photos',
+        authError: isAuthError(error)
+      });
     }
   });
 
