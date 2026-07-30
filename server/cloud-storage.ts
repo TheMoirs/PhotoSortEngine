@@ -56,7 +56,9 @@ async function oneDriveProxy(path: string, options?: { method?: string; body?: a
     fetchOptions.body = JSON.stringify(options.body);
     fetchOptions.headers = { 'Content-Type': 'application/json' };
   }
-  const response = await connectors.proxy('onedrive', path, fetchOptions);
+  // Microsoft Graph requires /v1.0/ version prefix
+  const versionedPath = path.startsWith('/v1.0') ? path : `/v1.0${path}`;
+  const response = await connectors.proxy('onedrive', versionedPath, fetchOptions);
   if (!response.ok && response.status !== 404) {
     const text = await response.text();
     throw Object.assign(new Error(`OneDrive API error ${response.status}: ${text}`), { statusCode: response.status });
@@ -178,11 +180,12 @@ export async function listOneDrivePhotos(folderId: string = 'root'): Promise<Clo
   while (nextPath) {
     const response = await oneDriveProxy(nextPath);
     allItems.push(...(response.value || []));
-    // nextLink from Graph API is a full URL; extract the path+query portion
+    // nextLink from Graph API is a full URL like https://graph.microsoft.com/v1.0/me/...
+    // Extract just the path+query so the proxy can handle it
     const nextLink: string | undefined = response['@odata.nextLink'];
     if (nextLink) {
       const url = new URL(nextLink);
-      nextPath = url.pathname + url.search;
+      nextPath = url.pathname + url.search; // already includes /v1.0/...
     } else {
       nextPath = null;
     }
