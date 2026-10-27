@@ -14,38 +14,38 @@
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
 
-  /* Colors - H S% L% format for Tailwind v4 opacity modifiers */
-  --color-background: 210 20% 98%;
-  --color-foreground: 220 15% 10%;
+  /* Colors - wrapped in hsl() so Tailwind v4 can use them (opacity modifiers still work) */
+  --color-background: hsl(210 20% 98%);
+  --color-foreground: hsl(220 15% 10%);
 
-  --color-card: 0 0% 100%;
-  --color-card-foreground: 220 15% 10%;
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(220 15% 10%);
 
-  --color-popover: 0 0% 100%;
-  --color-popover-foreground: 220 15% 10%;
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(220 15% 10%);
 
-  --color-primary: 220 15% 10%; /* Almost black */
-  --color-primary-foreground: 0 0% 100%;
+  --color-primary: hsl(220 15% 10%); /* Almost black */
+  --color-primary-foreground: hsl(0 0% 100%);
 
-  --color-secondary: 210 20% 94%;
-  --color-secondary-foreground: 220 15% 10%;
+  --color-secondary: hsl(210 20% 94%);
+  --color-secondary-foreground: hsl(220 15% 10%);
 
-  --color-muted: 210 20% 94%;
-  --color-muted-foreground: 220 10% 40%;
+  --color-muted: hsl(210 20% 94%);
+  --color-muted-foreground: hsl(220 10% 40%);
 
-  --color-accent: 210 40% 96%;
-  --color-accent-foreground: 220 15% 10%;
+  --color-accent: hsl(210 40% 96%);
+  --color-accent-foreground: hsl(220 15% 10%);
 
-  --color-destructive: 0 84% 60%;
-  --color-destructive-foreground: 0 0% 100%;
+  --color-destructive: hsl(0 84% 60%);
+  --color-destructive-foreground: hsl(0 0% 100%);
 
-  --color-border: 220 13% 91%;
-  --color-input: 220 13% 91%;
-  --color-ring: 220 15% 10%;
+  --color-border: hsl(220 13% 91%);
+  --color-input: hsl(220 13% 91%);
+  --color-ring: hsl(220 15% 10%);
 
-  /* Custom "Curator" Palette */
-  --color-folder-yellow: 45 90% 60%;
-  --color-folder-blue: 210 80% 60%;
+  /* Custom palette */
+  --color-folder-yellow: hsl(45 90% 60%);
+  --color-folder-blue: hsl(210 80% 60%);
 }
 
 @layer base {
