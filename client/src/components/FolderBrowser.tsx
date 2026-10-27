@@ -128,26 +128,33 @@ export function FolderBrowser({
         </div>
       ) : (
         <>
-          {/* Folders Grid */}
+          {/* Folders List */}
           {folders.length > 0 && (
             <div className="mb-8">
-              <h3 className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider">Folders</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
-                {folders.map((folder) => (
-                  <motion.button
-                    key={folder.id}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => onNavigate(folder.id, folder.name)}
-                    className="flex items-center gap-2 sm:gap-3 p-2 sm:p-4 bg-white rounded-lg sm:rounded-xl border border-border hover:border-primary/30 hover:shadow-md transition-all text-left"
-                    data-testid={`folder-${folder.id}`}
-                  >
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Folder className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
-                    </div>
-                    <span className="font-medium text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">{folder.name}</span>
-                  </motion.button>
-                ))}
+              <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">Folders</h3>
+              <div className="bg-white rounded-xl border border-border divide-y divide-border overflow-hidden">
+                {folders.map((folder) => {
+                  const modified = folder.modifiedTime || folder.createdTime;
+                  return (
+                    <button
+                      key={folder.id}
+                      onClick={() => onNavigate(folder.id, folder.name)}
+                      className="w-full flex items-center gap-3 px-3 sm:px-4 py-3 hover:bg-secondary transition-colors text-left"
+                      data-testid={`folder-${folder.id}`}
+                    >
+                      <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Folder className="w-4 h-4 fill-current" />
+                      </div>
+                      <span className="flex-1 min-w-0 font-medium text-sm break-words">{folder.name}</span>
+                      {modified && (
+                        <span className="hidden sm:block text-sm text-muted-foreground whitespace-nowrap">
+                          {new Date(modified).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </span>
+                      )}
+                      <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
