@@ -274,9 +274,9 @@ export default function Home() {
             className="flex items-center gap-2 hover:opacity-80 transition-opacity"
           >
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white font-display font-bold text-lg">
-              C
+              P
             </div>
-            <span className="font-display font-bold text-xl tracking-tight">Curator</span>
+            <span className="font-display font-bold text-xl tracking-tight">Photo Sort Engine</span>
           </button>
           
           {source && (
