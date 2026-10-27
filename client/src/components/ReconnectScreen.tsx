@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { WifiOff, RefreshCw, Cloud, CloudLightning } from "lucide-react";
+import { WifiOff, LogIn, Cloud, CloudLightning } from "lucide-react";
 
 interface ReconnectScreenProps {
   provider: 'gdrive' | 'onedrive';
@@ -10,6 +10,7 @@ export function ReconnectScreen({ provider, onBack }: ReconnectScreenProps) {
   const isGDrive = provider === 'gdrive';
   const Icon = isGDrive ? Cloud : CloudLightning;
   const name = isGDrive ? 'Google Drive' : 'OneDrive';
+  const signInUrl = isGDrive ? '/auth/google' : '/auth/microsoft';
 
   return (
     <motion.div
@@ -26,31 +27,11 @@ export function ReconnectScreen({ provider, onBack }: ReconnectScreenProps) {
         </div>
       </div>
 
-      <h2 className="text-2xl font-bold mb-2">{name} Disconnected</h2>
+      <h2 className="text-2xl font-bold mb-2">Sign in to {name}</h2>
       <p className="text-muted-foreground mb-8 leading-relaxed">
-        Your {name} connection has expired or been revoked. To reconnect, follow these steps:
+        You're not signed in to {name}, or your sign-in has expired. Sign in to let PhotoSortEngine
+        browse your photos and sort them into year folders.
       </p>
-
-      <ol className="text-left space-y-3 mb-8 w-full">
-        <li className="flex gap-3">
-          <span className="flex-shrink-0 w-6 h-6 bg-primary text-white rounded-full text-xs font-bold flex items-center justify-center">1</span>
-          <span className="text-sm text-muted-foreground pt-0.5">
-            Click the <strong className="text-foreground">Integrations</strong> button in the Replit toolbar (puzzle-piece icon), or ask me to reconnect it for you.
-          </span>
-        </li>
-        <li className="flex gap-3">
-          <span className="flex-shrink-0 w-6 h-6 bg-primary text-white rounded-full text-xs font-bold flex items-center justify-center">2</span>
-          <span className="text-sm text-muted-foreground pt-0.5">
-            Find <strong className="text-foreground">{name}</strong> and click <strong className="text-foreground">Connect</strong> to sign in again.
-          </span>
-        </li>
-        <li className="flex gap-3">
-          <span className="flex-shrink-0 w-6 h-6 bg-primary text-white rounded-full text-xs font-bold flex items-center justify-center">3</span>
-          <span className="text-sm text-muted-foreground pt-0.5">
-            Return here and try <strong className="text-foreground">{name}</strong> again.
-          </span>
-        </li>
-      </ol>
 
       <div className="flex flex-col sm:flex-row gap-3 w-full">
         <button
@@ -59,13 +40,13 @@ export function ReconnectScreen({ provider, onBack }: ReconnectScreenProps) {
         >
           ← Back
         </button>
-        <button
-          onClick={onBack}
+        <a
+          href={signInUrl}
           className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-primary text-white font-medium text-sm hover:bg-primary/90 transition-colors"
         >
-          <RefreshCw className="w-4 h-4" />
-          Try Again
-        </button>
+          <LogIn className="w-4 h-4" />
+          Sign in with {isGDrive ? 'Google' : 'Microsoft'}
+        </a>
       </div>
     </motion.div>
   );

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FilePicker } from "@/components/FilePicker";
 import { PhotoGrid } from "@/components/PhotoGrid";
 import { FolderView } from "@/components/FolderView";
@@ -103,6 +103,18 @@ export default function Home() {
       setState('picking');
     }
   };
+
+  // After signing in, Google/Microsoft send the user back to /?connected=gdrive|onedrive.
+  // Open that source straight away and tidy the address bar.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get('connected');
+    if (connected === 'gdrive' || connected === 'onedrive') {
+      window.history.replaceState(null, '', window.location.pathname);
+      handleSelectSource(connected);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleNavigateFolder = async (folderId: string, folderName: string) => {
     if (!source) return;

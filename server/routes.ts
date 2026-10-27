@@ -5,13 +5,14 @@ import {
   listGoogleDrivePhotos, 
   moveGoogleDriveFile, 
   createGoogleDriveFolder,
-  getGoogleDriveProxyResponse,
+  getGoogleDriveFileResponse,
   listOneDrivePhotos,
   moveOneDriveFile,
   createOneDriveFolder,
-  oneDriveProxy,
+  oneDriveRequest,
   type CloudFile
 } from "./cloud-storage";
+import { getAccessToken } from "./oauth";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -20,10 +21,8 @@ export async function registerRoutes(
   
   function isAuthError(error: any): boolean {
     const msg = error?.message || '';
-    return msg.includes('invalid_grant') || 
-           msg.includes('re-authorization') ||
-           msg.includes('disconnected') ||
-           msg.includes('not connected') ||
+    return msg.includes('invalid_grant') ||
+           msg.includes('Not signed in') ||
            error?.statusCode === 401 ||
            error?.statusCode === 403;
   }
@@ -31,8 +30,9 @@ export async function registerRoutes(
   // List photos from Google Drive
   app.get("/api/gdrive/photos", async (req, res) => {
     try {
+      const token = await getAccessToken(req, 'google');
       const folderId = (req.query.folderId as string) || 'root';
-      const files = await listGoogleDrivePhotos(folderId);
+      const files = await listGoogleDrivePhotos(token, folderId);
       res.json({ files });
     } catch (error: any) {
       console.error('Error listing Google Drive photos:', error);
@@ -46,8 +46,9 @@ export async function registerRoutes(
   // List photos from OneDrive
   app.get("/api/onedrive/photos", async (req, res) => {
     try {
+      const token = await getAccessToken(req, 'microsoft');
       const folderId = (req.query.folderId as string) || 'root';
-      const files = await listOneDrivePhotos(folderId);
+      const files = await listOneDrivePhotos(token, folderId);
       res.json({ files });
     } catch (error: any) {
       console.error('Error listing OneDrive photos:', error);
@@ -61,6 +62,7 @@ export async function registerRoutes(
   // Organize photos by year (Google Drive) - parallel batched for speed
   app.post("/api/gdrive/organize", async (req, res) => {
     try {
+      const token = await getAccessToken(req, 'google');
       const { files, parentFolderId } = req.body;
       
       if (!files || !Array.isArray(files)) {
@@ -68,7 +70,7 @@ export async function registerRoutes(
       }
 
       // First, get existing folders in the parent directory
-      const existingFiles = await listGoogleDrivePhotos(parentFolderId || 'root');
+      const existingFiles = await listGoogleDrivePhotos(token, parentFolderId || 'root');
       const existingFolders = existingFiles.filter(f => f.mimeType === 'application/vnd.google-apps.folder');
       
       // Build a map of existing year folders
@@ -88,7 +90,7 @@ export async function registerRoutes(
       const yearsArray = Array.from(yearsNeeded);
       for (const year of yearsArray) {
         if (!folderMap.has(year)) {
-          const folderId = await createGoogleDriveFolder(year, parentFolderId || 'root');
+          const folderId = await createGoogleDriveFolder(token, year, parentFolderId || 'root');
           folderMap.set(year, folderId);
         }
       }
@@ -103,7 +105,7 @@ export async function registerRoutes(
           const date = new Date(file.modifiedTime || file.createdTime);
           const year = date.getFullYear().toString();
           const yearFolderId = folderMap.get(year)!;
-          const moveResult = await moveGoogleDriveFile(file.id, yearFolderId);
+          const moveResult = await moveGoogleDriveFile(token, file.id, yearFolderId);
           return { fileId: file.id, year, folderId: yearFolderId, ...moveResult };
         });
         const batchResults = await Promise.allSettled(batchPromises);
@@ -121,13 +123,14 @@ export async function registerRoutes(
       res.json({ success: true, results, folders: Array.from(folderMap.entries()), moved, skipped });
     } catch (error: any) {
       console.error('Error organizing Google Drive photos:', error);
-      res.status(500).json({ error: error.message || 'Failed to organize photos' });
+      res.status(isAuthError(error) ? 401 : 500).json({ error: error.message || 'Failed to organize photos', authError: isAuthError(error) });
     }
   });
 
   // Organize photos by year (OneDrive) - parallel batched for speed
   app.post("/api/onedrive/organize", async (req, res) => {
     try {
+      const token = await getAccessToken(req, 'microsoft');
       const { files, parentFolderId } = req.body;
       
       if (!files || !Array.isArray(files)) {
@@ -135,7 +138,7 @@ export async function registerRoutes(
       }
 
       // First, get existing folders in the parent directory
-      const existingFiles = await listOneDrivePhotos(parentFolderId || 'root');
+      const existingFiles = await listOneDrivePhotos(token, parentFolderId || 'root');
       const existingFolders = existingFiles.filter(f => f.mimeType === 'application/vnd.folder');
       
       // Build a map of existing year folders
@@ -155,7 +158,7 @@ export async function registerRoutes(
       const yearsArray = Array.from(yearsNeeded);
       for (const year of yearsArray) {
         if (!folderMap.has(year)) {
-          const folderId = await createOneDriveFolder(year, parentFolderId || 'root');
+          const folderId = await createOneDriveFolder(token, year, parentFolderId || 'root');
           folderMap.set(year, folderId);
         }
       }
@@ -170,7 +173,7 @@ export async function registerRoutes(
           const date = new Date(file.modifiedTime || file.createdTime);
           const year = date.getFullYear().toString();
           const yearFolderId = folderMap.get(year)!;
-          const moveResult = await moveOneDriveFile(file.id, yearFolderId);
+          const moveResult = await moveOneDriveFile(token, file.id, yearFolderId);
           return { fileId: file.id, year, folderId: yearFolderId, ...moveResult };
         });
         const batchResults = await Promise.allSettled(batchPromises);
@@ -188,16 +191,17 @@ export async function registerRoutes(
       res.json({ success: true, results, folders: Array.from(folderMap.entries()), moved, skipped });
     } catch (error: any) {
       console.error('Error organizing OneDrive photos:', error);
-      res.status(500).json({ error: error.message || 'Failed to organize photos' });
+      res.status(isAuthError(error) ? 401 : 500).json({ error: error.message || 'Failed to organize photos', authError: isAuthError(error) });
     }
   });
 
   // Proxy Google Drive thumbnails (they require auth)
   app.get("/api/gdrive/thumbnail/:fileId", async (req, res) => {
     try {
+      const token = await getAccessToken(req, 'google');
       const { fileId } = req.params;
 
-      const response = await getGoogleDriveProxyResponse(`/drive/v3/files/${fileId}?alt=media`);
+      const response = await getGoogleDriveFileResponse(token, `/drive/v3/files/${fileId}?alt=media`);
 
       if (!response.ok) {
         return res.status(response.status).json({ error: 'Failed to fetch file' });
@@ -216,17 +220,18 @@ export async function registerRoutes(
       await pump();
     } catch (error: any) {
       console.error('Error fetching thumbnail:', error);
-      res.status(500).json({ error: 'Failed to fetch thumbnail' });
+      res.status(isAuthError(error) ? 401 : 500).json({ error: 'Failed to fetch thumbnail' });
     }
   });
 
   // Proxy OneDrive thumbnails
   app.get("/api/onedrive/thumbnail/:fileId", async (req, res) => {
     try {
+      const token = await getAccessToken(req, 'microsoft');
       const fileId = decodeURIComponent(req.params.fileId);
 
       // Fetch the item with thumbnails expanded in one request
-      const data = await oneDriveProxy(`/me/drive/items/${encodeURIComponent(fileId)}?expand=thumbnails`);
+      const data = await oneDriveRequest(token, `/me/drive/items/${encodeURIComponent(fileId)}?expand=thumbnails`);
 
       const thumbSet = data?.thumbnails?.[0];
       const thumbnailUrl = thumbSet?.large?.url || thumbSet?.medium?.url || thumbSet?.small?.url;
@@ -240,7 +245,7 @@ export async function registerRoutes(
       res.status(404).json({ error: 'No thumbnail available' });
     } catch (error: any) {
       console.error('Error fetching OneDrive thumbnail:', error);
-      res.status(500).json({ error: 'Failed to fetch thumbnail' });
+      res.status(isAuthError(error) ? 401 : 500).json({ error: 'Failed to fetch thumbnail' });
     }
   });
 

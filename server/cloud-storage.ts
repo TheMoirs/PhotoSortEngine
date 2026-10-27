@@ -1,12 +1,15 @@
-import { ReplitConnectors } from '@replit/connectors-sdk';
+// Talks to the Google Drive and Microsoft Graph (OneDrive) APIs directly,
+// using the signed-in user's access token from server/oauth.ts.
 
-async function googleDriveProxy(path: string, options?: { method?: string; body?: any; params?: Record<string, string> }): Promise<any> {
-  const connectors = new ReplitConnectors();
+const GOOGLE_API = 'https://www.googleapis.com';
+const GRAPH_API = 'https://graph.microsoft.com';
+
+async function googleDriveRequest(token: string, path: string, options?: { method?: string; body?: any; params?: Record<string, string> }): Promise<any> {
   const method = options?.method || 'GET';
-  const fetchOptions: any = { method };
+  const fetchOptions: RequestInit = { method, headers: { Authorization: `Bearer ${token}` } };
   if (options?.body !== undefined) {
     fetchOptions.body = JSON.stringify(options.body);
-    fetchOptions.headers = { 'Content-Type': 'application/json' };
+    fetchOptions.headers = { ...fetchOptions.headers, 'Content-Type': 'application/json' };
   }
   // Append query params if provided
   let fullPath = path;
@@ -14,7 +17,7 @@ async function googleDriveProxy(path: string, options?: { method?: string; body?
     const qs = new URLSearchParams(options.params).toString();
     fullPath = `${path}?${qs}`;
   }
-  const response = await connectors.proxy('google-drive', fullPath, fetchOptions);
+  const response = await fetch(`${GOOGLE_API}${fullPath}`, fetchOptions);
   if (!response.ok) {
     const text = await response.text();
     throw Object.assign(new Error(`Google Drive API error ${response.status}: ${text}`), { statusCode: response.status, code: response.status });
@@ -23,22 +26,20 @@ async function googleDriveProxy(path: string, options?: { method?: string; body?
   return response.json();
 }
 
-export async function getGoogleDriveProxyResponse(path: string): Promise<Response> {
-  const connectors = new ReplitConnectors();
-  return connectors.proxy('google-drive', path, { method: 'GET' });
+export async function getGoogleDriveFileResponse(token: string, path: string): Promise<Response> {
+  return fetch(`${GOOGLE_API}${path}`, { headers: { Authorization: `Bearer ${token}` } });
 }
 
-export async function oneDriveProxy(path: string, options?: { method?: string; body?: any }): Promise<any> {
-  const connectors = new ReplitConnectors();
+export async function oneDriveRequest(token: string, path: string, options?: { method?: string; body?: any }): Promise<any> {
   const method = options?.method || 'GET';
-  const fetchOptions: any = { method };
+  const fetchOptions: RequestInit = { method, headers: { Authorization: `Bearer ${token}` } };
   if (options?.body !== undefined) {
     fetchOptions.body = JSON.stringify(options.body);
-    fetchOptions.headers = { 'Content-Type': 'application/json' };
+    fetchOptions.headers = { ...fetchOptions.headers, 'Content-Type': 'application/json' };
   }
   // Microsoft Graph requires /v1.0/ version prefix
   const versionedPath = path.startsWith('/v1.0') ? path : `/v1.0${path}`;
-  const response = await connectors.proxy('onedrive', versionedPath, fetchOptions);
+  const response = await fetch(`${GRAPH_API}${versionedPath}`, fetchOptions);
   if (!response.ok && response.status !== 404) {
     const text = await response.text();
     throw Object.assign(new Error(`OneDrive API error ${response.status}: ${text}`), { statusCode: response.status });
@@ -58,7 +59,7 @@ export interface CloudFile {
   webViewLink?: string;
 }
 
-export async function listGoogleDrivePhotos(folderId: string = 'root'): Promise<CloudFile[]> {
+export async function listGoogleDrivePhotos(token: string, folderId: string = 'root'): Promise<CloudFile[]> {
   const allFiles: CloudFile[] = [];
   let pageToken: string | undefined = undefined;
 
@@ -70,7 +71,7 @@ export async function listGoogleDrivePhotos(folderId: string = 'root'): Promise<
     };
     if (pageToken) params.pageToken = pageToken;
 
-    const data = await googleDriveProxy('/drive/v3/files', { params });
+    const data = await googleDriveRequest(token, '/drive/v3/files', { params });
 
     const files = (data.files || []).map((file: any) => ({
       id: file.id,
@@ -90,16 +91,16 @@ export async function listGoogleDrivePhotos(folderId: string = 'root'): Promise<
   return allFiles;
 }
 
-export async function moveGoogleDriveFile(fileId: string, targetFolderId: string): Promise<{ moved: boolean; skipped: boolean; reason?: string }> {
+export async function moveGoogleDriveFile(token: string, fileId: string, targetFolderId: string): Promise<{ moved: boolean; skipped: boolean; reason?: string }> {
   try {
-    const file = await googleDriveProxy(`/drive/v3/files/${fileId}`, { params: { fields: 'parents' } });
+    const file = await googleDriveRequest(token, `/drive/v3/files/${fileId}`, { params: { fields: 'parents' } });
 
     if (file.parents?.includes(targetFolderId)) {
       return { moved: false, skipped: true, reason: 'File already in target folder' };
     }
 
     const previousParents = (file.parents || []).join(',');
-    await googleDriveProxy(`/drive/v3/files/${fileId}`, {
+    await googleDriveRequest(token, `/drive/v3/files/${fileId}`, {
       method: 'PATCH',
       params: { addParents: targetFolderId, removeParents: previousParents, fields: 'id,parents' },
     });
@@ -113,9 +114,9 @@ export async function moveGoogleDriveFile(fileId: string, targetFolderId: string
   }
 }
 
-export async function createGoogleDriveFolder(folderName: string, parentId: string = 'root'): Promise<string> {
+export async function createGoogleDriveFolder(token: string, folderName: string, parentId: string = 'root'): Promise<string> {
   // Check if folder already exists
-  const existing = await googleDriveProxy('/drive/v3/files', {
+  const existing = await googleDriveRequest(token, '/drive/v3/files', {
     params: {
       q: `'${parentId}' in parents and name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
       fields: 'files(id,name)',
@@ -126,7 +127,7 @@ export async function createGoogleDriveFolder(folderName: string, parentId: stri
     return existing.files[0].id;
   }
 
-  const created = await googleDriveProxy('/drive/v3/files', {
+  const created = await googleDriveRequest(token, '/drive/v3/files', {
     method: 'POST',
     params: { fields: 'id' },
     body: { name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] },
@@ -135,7 +136,7 @@ export async function createGoogleDriveFolder(folderName: string, parentId: stri
   return created.id;
 }
 
-export async function listOneDrivePhotos(folderId: string = 'root'): Promise<CloudFile[]> {
+export async function listOneDrivePhotos(token: string, folderId: string = 'root'): Promise<CloudFile[]> {
   const apiPath = folderId === 'root' ? '/me/drive/root/children' : `/me/drive/items/${folderId}/children`;
   
   const allItems: any[] = [];
@@ -143,10 +144,10 @@ export async function listOneDrivePhotos(folderId: string = 'root'): Promise<Clo
   
   // Paginate through all results
   while (nextPath) {
-    const response = await oneDriveProxy(nextPath);
+    const response = await oneDriveRequest(token, nextPath);
     allItems.push(...(response.value || []));
     // nextLink from Graph API is a full URL like https://graph.microsoft.com/v1.0/me/...
-    // Extract just the path+query so the proxy can handle it
+    // Extract just the path+query for the next request
     const nextLink: string | undefined = response['@odata.nextLink'];
     if (nextLink) {
       const url = new URL(nextLink);
@@ -200,16 +201,16 @@ export async function listOneDrivePhotos(folderId: string = 'root'): Promise<Clo
     });
 }
 
-export async function moveOneDriveFile(fileId: string, targetFolderId: string): Promise<{ moved: boolean; skipped: boolean; reason?: string }> {
+export async function moveOneDriveFile(token: string, fileId: string, targetFolderId: string): Promise<{ moved: boolean; skipped: boolean; reason?: string }> {
   try {
     // First check if file is already in the target folder
-    const file = await oneDriveProxy(`/me/drive/items/${fileId}`);
+    const file = await oneDriveRequest(token, `/me/drive/items/${fileId}`);
     if (file.parentReference?.id === targetFolderId) {
       return { moved: false, skipped: true, reason: 'File already in target folder' };
     }
     
     // Try to move the file with replace behavior for conflicts
-    await oneDriveProxy(`/me/drive/items/${fileId}`, {
+    await oneDriveRequest(token, `/me/drive/items/${fileId}`, {
       method: 'PATCH',
       body: {
         parentReference: { id: targetFolderId },
@@ -220,13 +221,13 @@ export async function moveOneDriveFile(fileId: string, targetFolderId: string): 
   } catch (error: any) {
     if (error.statusCode === 409) {
       try {
-        const file = await oneDriveProxy(`/me/drive/items/${fileId}`);
+        const file = await oneDriveRequest(token, `/me/drive/items/${fileId}`);
         const fileName = file.name;
-        const existingFile = await oneDriveProxy(`/me/drive/items/${targetFolderId}:/${fileName}`);
+        const existingFile = await oneDriveRequest(token, `/me/drive/items/${targetFolderId}:/${fileName}`);
         if (existingFile && existingFile.id) {
-          await oneDriveProxy(`/me/drive/items/${existingFile.id}`, { method: 'DELETE' });
+          await oneDriveRequest(token, `/me/drive/items/${existingFile.id}`, { method: 'DELETE' });
         }
-        await oneDriveProxy(`/me/drive/items/${fileId}`, {
+        await oneDriveRequest(token, `/me/drive/items/${fileId}`, {
           method: 'PATCH',
           body: { parentReference: { id: targetFolderId } }
         });
@@ -240,13 +241,13 @@ export async function moveOneDriveFile(fileId: string, targetFolderId: string): 
   }
 }
 
-export async function createOneDriveFolder(folderName: string, parentId: string = 'root'): Promise<string> {
+export async function createOneDriveFolder(token: string, folderName: string, parentId: string = 'root'): Promise<string> {
   // First, try to get the folder by path
   try {
     const pathQuery = parentId === 'root'
       ? `/me/drive/root:/${folderName}`
       : `/me/drive/items/${parentId}:/${folderName}`;
-    const existing = await oneDriveProxy(pathQuery);
+    const existing = await oneDriveRequest(token, pathQuery);
     if (existing && existing.id && existing.folder) {
       return existing.id;
     }
@@ -259,7 +260,7 @@ export async function createOneDriveFolder(folderName: string, parentId: string 
   const createPath = parentId === 'root' ? '/me/drive/root/children' : `/me/drive/items/${parentId}/children`;
   
   try {
-    const response = await oneDriveProxy(createPath, {
+    const response = await oneDriveRequest(token, createPath, {
       method: 'POST',
       body: { name: folderName, folder: {}, '@microsoft.graph.conflictBehavior': 'fail' }
     });
@@ -270,7 +271,7 @@ export async function createOneDriveFolder(folderName: string, parentId: string 
         const pathQuery = parentId === 'root'
           ? `/me/drive/root:/${folderName}`
           : `/me/drive/items/${parentId}:/${folderName}`;
-        const existing = await oneDriveProxy(pathQuery);
+        const existing = await oneDriveRequest(token, pathQuery);
         if (existing && existing.id) return existing.id;
       } catch (retryError) {
         console.log('Retry path lookup failed:', retryError);

@@ -1,10 +1,46 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
+import createMemoryStore from "memorystore";
+import { randomBytes } from "crypto";
 import { registerRoutes } from "./routes";
+import { registerAuthRoutes } from "./oauth";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 
+// Load settings from a .env file when running locally (Render sets them directly)
+try {
+  process.loadEnvFile();
+} catch {
+  // no .env file — fine
+}
+
+const isProduction = process.env.NODE_ENV === "production";
+
 const app = express();
 const httpServer = createServer(app);
+
+// Render (and most hosts) sit behind a proxy; needed for secure cookies
+app.set("trust proxy", 1);
+
+if (!process.env.SESSION_SECRET) {
+  console.warn("SESSION_SECRET is not set — using a random one, so sign-ins won't survive a restart.");
+}
+
+const MemoryStore = createMemoryStore(session);
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || randomBytes(32).toString("hex"),
+    resave: false,
+    saveUninitialized: false,
+    store: new MemoryStore({ checkPeriod: 24 * 60 * 60 * 1000 }),
+    cookie: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: isProduction,
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    },
+  }),
+);
 
 declare module "http" {
   interface IncomingMessage {
@@ -61,6 +97,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  registerAuthRoutes(app);
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -74,26 +111,16 @@ app.use((req, res, next) => {
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  if (process.env.NODE_ENV === "production") {
+  if (isProduction) {
     serveStatic(app);
   } else {
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
+  // Serves both the API and the client. Render provides PORT; locally it defaults to 5000.
   const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
+  httpServer.listen({ port, host: "0.0.0.0" }, () => {
+    log(`serving on port ${port}`);
+  });
 })();
